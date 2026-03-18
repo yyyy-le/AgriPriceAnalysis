@@ -67,7 +67,8 @@ const handleLogin = async () => {
     try {
       await authStore.login(form.value.username, form.value.password)
       ElMessage.success('登录成功')
-      router.push('/dashboard')
+      // 根据 role 跳转不同端
+      router.push(authStore.role === 'admin' ? '/admin/users' : '/dashboard')
     } catch (e) {
       ElMessage.error('用户名或密码错误')
     } finally {

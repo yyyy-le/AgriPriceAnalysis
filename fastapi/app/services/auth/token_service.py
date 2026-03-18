@@ -17,13 +17,16 @@ from config.redis_key import settings as redis_key_settings
 
 
 def create_token_response_from_user(user: UserModel) -> TokenSc:
-    """根据用户模型创建令牌响应"""
     expires_delta = timedelta(minutes=settings.JWT_TTL)
     expires_in = int(expires_delta.total_seconds())
     token = jwt_helper.create_access_token(user.id, expires_delta=expires_delta)
 
-    return TokenSc(token_type='bearer', expires_in=expires_in, access_token=token)
-
+    return TokenSc(
+        token_type='bearer',
+        expires_in=expires_in,
+        access_token=token,
+        role='admin' if user.is_admin else 'user',  # 新增
+    )
 
 async def validate_token(token: str) -> JWTSc:
     """验证 token 并返回解码后的数据"""
