@@ -37,7 +37,6 @@
       </el-row>
     </el-card>
 
-    <!-- 日志输出 -->
     <el-card style="margin-top:20px">
       <template #header>
         <span>📋 运行日志</span>
@@ -55,7 +54,7 @@
 <script setup>
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import request from '../utils/request'
+import request from '../../utils/request'
 
 const task = ref({ status: 'idle', result: null })
 const logs = ref([])
@@ -75,10 +74,9 @@ const triggerCrawl = async () => {
     const taskId = res.task_id
     addLog(`任务ID: ${taskId}`, '#909399')
 
-    // 轮询状态
     pollTimer = setInterval(async () => {
       const status = await request.get(`/api/crawl/status/${taskId}`)
-      
+
       if (status.status === 'success') {
         clearInterval(pollTimer)
         task.value = { status: 'success', result: status.result }
