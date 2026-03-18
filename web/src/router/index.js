@@ -58,6 +58,11 @@ const routes = [
     component: () => import('../views/admin/Logs.vue'),
     meta: { role: 'admin' }
   },
+  {
+  path: '/ai',
+  component: () => import('../views/user/AiChat.vue'),
+  meta: { role: 'user' }
+},
 
   // 兜底 404
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' }
@@ -89,5 +94,7 @@ router.beforeEach((to, from, next) => {
 
   next()
 })
+
+
 
 export default router

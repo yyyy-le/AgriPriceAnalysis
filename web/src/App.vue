@@ -28,6 +28,7 @@
         <el-menu-item index="/price">📋 价格列表</el-menu-item>
         <el-menu-item index="/analysis">📈 数据分析</el-menu-item>
         <el-menu-item index="/alerts">🔔 价格预警</el-menu-item>
+        <el-menu-item index="/ai">🤖 AI 助手</el-menu-item>
         <el-menu-item index="/profile">👤 个人中心</el-menu-item>
       </el-menu>
 
