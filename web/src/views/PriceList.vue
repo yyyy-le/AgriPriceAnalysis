@@ -1,0 +1,1 @@
+<template><div>PriceList</div></template>
