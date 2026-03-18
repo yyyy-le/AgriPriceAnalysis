@@ -14,7 +14,7 @@
           <el-table-column prop="单位" label="单位"/>
           <el-table-column prop="日期" label="日期"/>
         </el-table>
-        <p style="color:#e6a23c">⚠️ 日期格式必须为 <strong>YYYY-MM-DD</strong>，如 2026-03-16</p>
+        <p style="color:#e6a23c">⚠️ 日期格式支持 <strong>YYYY-MM-DD</strong> 或 <strong>YYYY/M/D</strong>，如 2026-03-16 或 2026/3/16</p>
         <el-button type="primary" plain size="small" @click="downloadTemplate" style="margin-top:8px">
           下载模板文件
         </el-button>
