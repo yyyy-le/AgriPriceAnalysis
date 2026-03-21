@@ -85,15 +85,12 @@
               `">
                 {{ username }}
               </div>
-              <div style="font-size:11px;color:#475569;margin-top:2px">
+              <div style="font-size:13px;color:#94a3b8;margin-top:2px">
                 {{ isAdmin ? '管理员' : '普通用户' }}
               </div>
             </div>
           </div>
-          <div
-            @click="handleLogout"
-            style="font-size:12px;color:#475569;cursor:pointer;padding:4px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.08);white-space:nowrap;flex-shrink:0"
-          >退出</div>
+          <div class="logout-btn" @click="handleLogout">退出</div>
         </div>
       </div>
 
@@ -172,7 +169,7 @@ const goProfile = () => {
 
 const handleLogout = () => {
   authStore.logout()
-  router.push('/login')
+  window.location.href = '/login'
 }
 
 onMounted(() => {
@@ -188,4 +185,22 @@ a { text-decoration: none; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* 退出按钮 */
+.logout-btn {
+  font-size: 13px;
+  color: #64748b;
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+.logout-btn:hover {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.35);
+}
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div style="width:100%">
     <el-card style="margin-bottom:20px">
       <el-row :gutter="12">
         <el-col :span="8">
@@ -16,26 +16,32 @@
       </el-row>
     </el-card>
 
-    <el-card>
-      <el-table :data="list" stripe v-loading="loading" style="width:100%">
-        <el-table-column prop="time" label="日期" width="120">
+    <el-card style="width:100%">
+      <el-table
+        :data="list"
+        stripe
+        v-loading="loading"
+        style="width:100%"
+        table-layout="fixed"
+      >
+        <el-table-column prop="time" label="日期" min-width="110">
           <template #default="{ row }">{{ formatDate(row.time) }}</template>
         </el-table-column>
-        <el-table-column prop="product_name" label="产品名称" width="150"/>
-        <el-table-column prop="category_name" label="分类" width="120"/>
-        <el-table-column prop="market_name" label="市场/产地" width="120"/>
-        <el-table-column prop="avg_price" label="均价" width="100">
+        <el-table-column prop="product_name" label="产品名称" min-width="120"/>
+        <el-table-column prop="category_name" label="分类" min-width="90"/>
+        <el-table-column prop="market_name" label="市场/产地" min-width="120"/>
+        <el-table-column prop="avg_price" label="均价" min-width="90">
           <template #default="{ row }">
             <el-tag type="warning">{{ row.avg_price?.toFixed(2) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="min_price" label="最低价" width="100">
+        <el-table-column prop="min_price" label="最低价" min-width="90">
           <template #default="{ row }">{{ row.min_price?.toFixed(2) }}</template>
         </el-table-column>
-        <el-table-column prop="max_price" label="最高价" width="100">
+        <el-table-column prop="max_price" label="最高价" min-width="90">
           <template #default="{ row }">{{ row.max_price?.toFixed(2) }}</template>
         </el-table-column>
-        <el-table-column prop="unit" label="单位" width="80"/>
+        <el-table-column prop="unit" label="单位" min-width="70"/>
       </el-table>
 
       <el-pagination

@@ -1,14 +1,15 @@
 <template>
   <div>
-    <el-card style="margin-bottom:16px">
-      <el-row :gutter="12">
-        <el-col :span="8">
+      <el-card style="margin-bottom:16px">
+      <el-row :gutter="12" align="middle">
+        <el-col :span="10">
           <el-input v-model="keyword" placeholder="搜索用户名/手机号/昵称" clearable @change="fetchData"/>
         </el-col>
         <el-col :span="4">
           <el-button type="primary" @click="fetchData">搜索</el-button>
         </el-col>
-        <el-col :span="4">
+        <!-- 新增用户按钮移到同一行最右侧 -->
+        <el-col :span="10" style="text-align:right">
           <el-button type="success" @click="openAdd">+ 新增用户</el-button>
         </el-col>
       </el-row>

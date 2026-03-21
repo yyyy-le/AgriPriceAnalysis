@@ -70,7 +70,6 @@ async def create_user_by_admin(
 ):
     from app.support.password_helper import get_password_hash
 
-    # 检查用户名是否重复
     exists = await session.execute(
         text("SELECT id FROM users WHERE username = :username"),
         {"username": username}
@@ -78,7 +77,6 @@ async def create_user_by_admin(
     if exists.fetchone():
         raise HTTPException(status_code=400, detail=f'用户名「{username}」已存在')
 
-    # 检查手机号是否重复
     exists_phone = await session.execute(
         text("SELECT id FROM users WHERE cellphone = :cellphone"),
         {"cellphone": cellphone}
@@ -113,7 +111,6 @@ async def update_user_by_admin(
 ):
     from app.support.password_helper import get_password_hash
 
-    # 检查手机号是否被其他用户占用
     exists_phone = await session.execute(
         text("SELECT id FROM users WHERE cellphone = :cellphone AND id != :id"),
         {"cellphone": cellphone, "id": user_id}
@@ -189,15 +186,18 @@ async def delete_user(
     return {"success": True}
 
 
-# ===== 数据管理 =====
+# ===== 数据管理：按产品聚合 =====
 
-@router.get('/data/records', name='价格记录列表')
-async def get_price_records(
+@router.get('/data/products', name='按产品聚合价格数据')
+async def get_products_aggregated(
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
     admin: Annotated[UserModel, Depends(require_admin)],
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     product_name: Optional[str] = Query(None),
+    category_id: Optional[int] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
 ):
     offset = (page - 1) * page_size
     params = {"limit": page_size, "offset": offset}
@@ -206,7 +206,141 @@ async def get_price_records(
     if product_name:
         where_clauses.append("p.name ILIKE :product_name")
         params["product_name"] = f"%{product_name}%"
+    if category_id:
+        where_clauses.append("p.category_id = :category_id")
+        params["category_id"] = category_id
+    # 日期条件：直接拼字符串到 SQL，避免 asyncpg 参数解析问题
+    lateral_date_clauses = ["product_id = p.id"]
+    if start_date:
+        lateral_date_clauses.append(f"time >= '{start_date}'")
+    if end_date:
+        lateral_date_clauses.append(f"time < '{end_date}'::date + INTERVAL '1 day'")
 
+    lateral_where = " AND ".join(lateral_date_clauses)
+    outer_where = " AND ".join(where_clauses)  # 只含 p.name / p.category_id
+
+    sql = f"""
+        SELECT
+            p.id as product_id,
+            p.name as product_name,
+            c.name as category_name,
+            p.unit,
+            stats.record_count,
+            stats.min_price,
+            stats.max_price,
+            stats.latest_avg,
+            stats.latest_date,
+            stats.source
+        FROM products p
+        JOIN categories c ON p.category_id = c.id
+        JOIN LATERAL (
+            SELECT
+                COUNT(*) as record_count,
+                ROUND(MIN(min_price)::numeric, 2) as min_price,
+                ROUND(MAX(max_price)::numeric, 2) as max_price,
+                ROUND(AVG(avg_price)::numeric, 2) as latest_avg,
+                DATE(MAX(time)) as latest_date,
+                MAX(source) as source
+            FROM price_records
+            WHERE {lateral_where}
+        ) stats ON stats.record_count > 0
+        WHERE {outer_where}
+        ORDER BY stats.latest_date DESC, p.name ASC
+        LIMIT :limit OFFSET :offset
+    """
+
+    count_sql = f"""
+        SELECT COUNT(DISTINCT p.id)
+        FROM products p
+        JOIN categories c ON p.category_id = c.id
+        JOIN LATERAL (
+            SELECT COUNT(*) as cnt
+            FROM price_records
+            WHERE {lateral_where}
+        ) stats ON stats.cnt > 0
+        WHERE {outer_where}
+    """
+
+    total_records_sql = f"""
+        SELECT COUNT(*)
+        FROM price_records pr
+        JOIN products p ON pr.product_id = p.id
+        JOIN categories c ON p.category_id = c.id
+        WHERE pr.product_id = p.id
+        {f"AND pr.time >= '{start_date}'" if start_date else ""}
+        {f"AND pr.time < '{end_date}'::date + INTERVAL '1 day'" if end_date else ""}
+        {f"AND p.name ILIKE :product_name" if product_name else ""}
+        {f"AND p.category_id = :category_id" if category_id else ""}
+    """
+
+    rows = await session.execute(text(sql), params)
+    count_params = {k: v for k, v in params.items() if k not in ('limit', 'offset')}
+    total = await session.execute(text(count_sql), count_params)
+    total_records = await session.execute(text(total_records_sql), count_params)
+
+    return {
+        "total": total.scalar(),
+        "total_records": total_records.scalar(),
+        "page": page,
+        "page_size": page_size,
+        "list": [dict(r._mapping) for r in rows],
+    }
+
+
+# ===== 数据管理：原始记录（用于展开行） =====
+
+@router.get('/data/records', name='价格记录列表')
+async def get_price_records(
+    session: Annotated[AsyncSession, Depends(database_deps.get_db)],
+    admin: Annotated[UserModel, Depends(require_admin)],
+    page: int = Query(1, ge=1),
+    page_size: int = Query(30, ge=1, le=100),
+    product_id: Optional[int] = Query(None),
+    product_name: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+):
+    if product_id:
+        # 日期条件直接拼字符串，避免 asyncpg 参数解析问题
+        date_clause = ""
+        if start_date:
+            date_clause += f" AND pr.time >= '{start_date}'"
+        if end_date:
+            date_clause += f" AND pr.time < '{end_date}'::date + INTERVAL '1 day'"
+        # 没有指定日期范围时，默认取最近 90 天
+        if not start_date and not end_date:
+            date_clause = """ AND pr.time >= (
+                  SELECT MAX(time) - INTERVAL '90 days'
+                  FROM price_records
+                  WHERE product_id = :product_id
+              )"""
+
+        sql = f"""
+            SELECT
+                pr.time, pr.product_id, pr.min_price, pr.max_price,
+                pr.avg_price, pr.source, m.name as market_name
+            FROM price_records pr
+            LEFT JOIN markets m ON pr.market_id = m.id
+            WHERE pr.product_id = :product_id
+            {date_clause}
+            ORDER BY pr.time DESC
+            LIMIT :limit
+        """
+        rows = await session.execute(text(sql), {"product_id": product_id, "limit": page_size})
+        return {
+            "total": page_size,
+            "page": 1,
+            "page_size": page_size,
+            "list": [dict(r._mapping) for r in rows],
+        }
+
+    # 通用场景：按产品名模糊搜索（带完整 JOIN）
+    offset = (page - 1) * page_size
+    params = {"limit": page_size, "offset": offset}
+    where_clauses = ["1=1"]
+    if product_name:
+        where_clauses.append("p.name ILIKE :product_name")
+        params["product_name"] = f"%{product_name}%"
     where = " AND ".join(where_clauses)
 
     sql = f"""
@@ -226,11 +360,9 @@ async def get_price_records(
         JOIN products p ON pr.product_id = p.id
         WHERE {where}
     """
-
     rows = await session.execute(text(sql), params)
     count_params = {k: v for k, v in params.items() if k not in ('limit', 'offset')}
     total = await session.execute(text(count_sql), count_params)
-
     return {
         "total": total.scalar(),
         "page": page,
@@ -246,7 +378,6 @@ async def delete_price_record(
     product_id: int = Query(...),
     time: str = Query(...),
 ):
-    from datetime import datetime
     from dateutil import parser as dateparser
     parsed_time = dateparser.parse(time)
     await session.execute(
@@ -255,6 +386,7 @@ async def delete_price_record(
     )
     await session.commit()
     return {"success": True}
+
 
 @router.put('/data/records', name='编辑价格记录')
 async def update_price_record(
@@ -279,6 +411,7 @@ async def update_price_record(
     await session.commit()
     return {"success": True}
 
+
 @router.post('/data/import-csv', name='CSV导入价格数据')
 async def import_csv(
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
@@ -287,10 +420,9 @@ async def import_csv(
 ):
     import csv
     import io
-    from datetime import datetime
 
     content = await file.read()
-    text_content = content.decode('utf-8-sig')  # 支持带BOM的UTF-8
+    text_content = content.decode('utf-8-sig')
     reader = csv.DictReader(io.StringIO(text_content))
 
     saved = 0
@@ -321,7 +453,6 @@ async def import_csv(
                 continue
             record_time = record_time.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
 
-            # 获取或创建分类
             cat_row = await session.execute(
                 text("SELECT id FROM categories WHERE name = :name"), {"name": category_name}
             )
@@ -335,7 +466,6 @@ async def import_csv(
                 )
                 category_id = cat_result.fetchone()[0]
 
-            # 获取或创建产品
             prod_row = await session.execute(
                 text("SELECT id FROM products WHERE name = :name AND category_id = :cat_id"),
                 {"name": product_name, "cat_id": category_id}
@@ -350,7 +480,6 @@ async def import_csv(
                 )
                 product_id = prod_result.fetchone()[0]
 
-            # 获取或创建市场
             mkt_row = await session.execute(
                 text("SELECT id FROM markets WHERE name = :name"), {"name": market_name}
             )
@@ -364,7 +493,6 @@ async def import_csv(
                 )
                 market_id = mkt_result.fetchone()[0]
 
-            # 插入价格记录
             result = await session.execute(text("""
                 INSERT INTO price_records (time, product_id, market_id, price, min_price, max_price, avg_price, source)
                 VALUES (:time, :product_id, :market_id, :avg_price, :min_price, :max_price, :avg_price, 'csv')
@@ -403,4 +531,3 @@ async def get_logs(
     """
     rows = await session.execute(text(sql))
     return [dict(r._mapping) for r in rows]
-

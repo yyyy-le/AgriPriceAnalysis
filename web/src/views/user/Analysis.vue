@@ -148,14 +148,16 @@
             </el-button>
           </div>
         </template>
-        <div v-if="analysisText" style="line-height:1.9;font-size:14px;color:#303133;white-space:pre-wrap">
-          {{ analysisText }}
-          <span v-if="analysisLoading" style="display:inline-block;animation:blink 1s infinite;color:#409eff">▋</span>
-        </div>
-        <el-empty v-else-if="!analysisLoading" description="点击「生成报告」获取AI分析" :image-size="80"/>
-        <div v-else style="text-align:center;padding:40px;color:#999">
+
+        <!-- 加载中 -->
+        <div v-if="analysisLoading && !analysisText" style="text-align:center;padding:40px;color:#999">
           <div style="margin-top:12px">AI 正在分析中...</div>
         </div>
+
+        <!-- 渲染 Markdown 内容 -->
+        <div v-else-if="analysisText || analysisLoading" class="ai-report-content" v-html="renderedAnalysis"></div>
+
+        <el-empty v-else description="点击「生成报告」获取AI分析" :image-size="80"/>
       </el-card>
     </template>
 
@@ -164,7 +166,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick, watch } from 'vue'
+import { ref, nextTick, watch, computed } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
@@ -173,7 +175,7 @@ import { searchProducts, getPriceTrend, predictPrice, predictAnalysis } from '..
 const searchName = ref('')
 const selectedProductId = ref(null)
 const selectedProductName = ref('')
-const days = ref(30)
+const days = ref(7)
 const trendData = ref([])
 const productOptions = ref([])
 const chartRef = ref(null)
@@ -187,6 +189,65 @@ const analysisText = ref('')
 let chart = null
 let predictChart = null
 let searchTimer = null
+
+// 简单的 Markdown 转 HTML 函数
+function renderMarkdown(text) {
+  if (!text) return ''
+
+  let html = text
+    // 转义 HTML 特殊字符（防 XSS），但保留我们自己插入的标签
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+
+  // 处理标题 ### ## #
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>')
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>')
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>')
+
+  // 处理分割线 ---
+  html = html.replace(/^---+$/gm, '<hr/>')
+
+  // 处理加粗 **text**
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+
+  // 处理斜体 *text*（单个*，排除已处理的**）
+  html = html.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
+
+  // 处理无序列表项（- 开头）
+  html = html.replace(/^[-•] (.+)$/gm, '<li>$1</li>')
+
+  // 将连续的 li 包裹在 ul 中
+  html = html.replace(/(<li>[\s\S]*?<\/li>)(\n<li>[\s\S]*?<\/li>)*/g, (match) => {
+    return '<ul>' + match + '</ul>'
+  })
+
+  // 处理段落：将空行分隔的文本块包裹在 <p> 中
+  // 先按两个以上换行符分割成段落
+  const blocks = html.split(/\n{2,}/)
+  html = blocks.map(block => {
+    block = block.trim()
+    if (!block) return ''
+    // 如果已经是 HTML 标签开头，不再包裹
+    if (/^<(h[1-6]|ul|ol|li|hr|blockquote|div|p)/.test(block)) {
+      return block
+    }
+    // 处理段落内的换行为 <br>
+    block = block.replace(/\n/g, '<br/>')
+    return '<p>' + block + '</p>'
+  }).join('\n')
+
+  return html
+}
+
+// 计算属性：渲染后的分析文本（流式追加时实时更新）
+const renderedAnalysis = computed(() => {
+  const text = analysisText.value
+  if (!text) return ''
+  // 流式加载时末尾加光标
+  const cursor = analysisLoading.value ? '<span class="ai-cursor">▋</span>' : ''
+  return renderMarkdown(text) + cursor
+})
 
 const onSearchInput = () => {
   clearTimeout(searchTimer)
@@ -309,10 +370,7 @@ const renderPredictChart = () => {
   const upperBound = predictData.value.predictions.map(d => d.upper_bound)
   const lowerBound = predictData.value.predictions.map(d => d.lower_bound)
 
-  // 连接点：历史最后一个点 + 预测第一个点
   const allDates = [...historyDates, ...predictDates]
-  const connectPrice = new Array(historyDates.length).fill(null)
-  connectPrice[historyDates.length - 1] = historyPrices[historyPrices.length - 1]
 
   predictChart.setOption({
     tooltip: { trigger: 'axis' },
@@ -362,8 +420,65 @@ watch(selectedProductId, () => {
   from { transform: rotate(0deg) }
   to { transform: rotate(360deg) }
 }
+
 @keyframes blink {
   0%, 100% { opacity: 1 }
   50% { opacity: 0 }
+}
+
+/* AI 分析报告样式 */
+.ai-report-content {
+  font-size: 14px;
+  line-height: 1.9;
+  color: #303133;
+}
+
+.ai-report-content :deep(h1),
+.ai-report-content :deep(h2),
+.ai-report-content :deep(h3) {
+  font-weight: 600;
+  color: #1e293b;
+  margin: 16px 0 8px;
+}
+
+.ai-report-content :deep(h1) { font-size: 20px; }
+.ai-report-content :deep(h2) { font-size: 17px; }
+.ai-report-content :deep(h3) { font-size: 15px; }
+
+.ai-report-content :deep(p) {
+  margin: 0 0 12px;
+}
+
+.ai-report-content :deep(strong) {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.ai-report-content :deep(em) {
+  font-style: italic;
+  color: #555;
+}
+
+.ai-report-content :deep(ul) {
+  padding-left: 20px;
+  margin: 8px 0 12px;
+}
+
+.ai-report-content :deep(li) {
+  margin-bottom: 4px;
+  list-style-type: disc;
+}
+
+.ai-report-content :deep(hr) {
+  border: none;
+  border-top: 1px solid #e8eaf0;
+  margin: 16px 0;
+}
+
+.ai-cursor {
+  display: inline-block;
+  animation: blink 1s infinite;
+  color: #409eff;
+  font-weight: bold;
 }
 </style>
