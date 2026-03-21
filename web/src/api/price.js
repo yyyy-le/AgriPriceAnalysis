@@ -35,3 +35,31 @@ export const getMarketStats = () =>
 
 export const searchProducts = (keyword) =>
   request.get('/api/prices/products/search', { params: { keyword } })
+
+export const predictPrice = (params) =>
+  request.get('/api/prices/predict', { params })
+
+export const predictAnalysis = async (params, onChunk) => {
+  const token = localStorage.getItem('token')
+  const query = new URLSearchParams(params).toString()
+  const response = await fetch(`http://localhost:8000/api/prices/predict/analysis?${query}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder('utf-8')
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    const text = decoder.decode(value, { stream: true })
+    onChunk && onChunk(text)
+  }
+}
+export const getProvinceStats = () =>
+  request.get('/api/prices/province-stats')
+
+
+export const getWordCloud = () =>
+  request.get('/api/prices/wordcloud')
+
+export const getVolatilityTrend = () =>
+  request.get('/api/prices/volatility-trend')

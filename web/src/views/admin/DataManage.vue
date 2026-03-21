@@ -11,42 +11,31 @@
       </el-row>
     </el-card>
 
-    <el-card>
-      <el-table :data="list" stripe v-loading="loading" style="width:100%">
-        <el-table-column prop="time" label="时间" width="180">
-          <template #default="{ row }">{{ formatDate(row.time) }}</template>
-        </el-table-column>
-        <el-table-column prop="product_name" label="产品" width="120"/>
-        <el-table-column prop="category_name" label="分类" width="100"/>
-        <el-table-column prop="market_name" label="市场" width="100"/>
-        <el-table-column prop="avg_price" label="均价" width="90">
-          <template #default="{ row }">
-            <el-tag type="warning">{{ row.avg_price }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="min_price" label="最低价" width="90"/>
-        <el-table-column prop="max_price" label="最高价" width="90"/>
-        <el-table-column prop="unit" label="单位" width="70"/>
-        <el-table-column prop="source" label="来源" width="90"/>
-        <el-table-column label="操作" width="140" fixed="right">
-          <template #default="{ row }">
-            <el-space>
-              <el-button size="small" type="primary" @click="openEdit(row)">编辑</el-button>
-              <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
-            </el-space>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <el-pagination
-        style="margin-top:16px;justify-content:flex-end;display:flex"
-        :current-page="page"
-        :page-size="pageSize"
-        :total="total"
-        layout="total, prev, pager, next"
-        @current-change="(p) => { page = p; fetchData() }"
-      />
-    </el-card>
+    <el-table :data="list" stripe v-loading="loading" style="width:100%" table-layout="auto">
+  <el-table-column prop="time" label="时间" min-width="160">
+    <template #default="{ row }">{{ formatDate(row.time) }}</template>
+  </el-table-column>
+  <el-table-column prop="product_name" label="产品" min-width="100"/>
+  <el-table-column prop="category_name" label="分类" min-width="80"/>
+  <el-table-column prop="market_name" label="市场" min-width="100"/>
+  <el-table-column prop="avg_price" label="均价" min-width="80">
+    <template #default="{ row }">
+      <el-tag type="warning">{{ row.avg_price }}</el-tag>
+    </template>
+  </el-table-column>
+  <el-table-column prop="min_price" label="最低价" min-width="80"/>
+  <el-table-column prop="max_price" label="最高价" min-width="80"/>
+  <el-table-column prop="unit" label="单位" min-width="60"/>
+  <el-table-column prop="source" label="来源" min-width="80"/>
+  <el-table-column label="操作" min-width="140" fixed="right">
+    <template #default="{ row }">
+      <el-space>
+        <el-button size="small" type="primary" @click="openEdit(row)">编辑</el-button>
+        <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+      </el-space>
+    </template>
+  </el-table-column>
+</el-table>
 
     <!-- 编辑弹窗 -->
     <el-dialog v-model="dialogVisible" title="编辑价格记录" width="420px">

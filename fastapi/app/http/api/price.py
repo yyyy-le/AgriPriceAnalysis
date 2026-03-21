@@ -250,3 +250,113 @@ async def search_products(
     """
     rows = await session.execute(text(sql), {"keyword": f"%{keyword}%"})
     return [dict(r._mapping) for r in rows]
+
+
+@router.get('/province-stats', name='各省产地数据量')
+async def get_province_stats(
+    session: Annotated[AsyncSession, Depends(database_deps.get_db)],
+    user: Annotated[UserModel, Depends(auth_deps.get_auth_user)],
+):
+    sql = """
+        SELECT m.name as market_name, COUNT(*) as count
+        FROM price_records pr
+        LEFT JOIN markets m ON pr.market_id = m.id
+        WHERE m.name IS NOT NULL AND m.name != '未知'
+        GROUP BY m.name
+        ORDER BY count DESC
+    """
+    rows = await session.execute(text(sql))
+    data = [dict(r._mapping) for r in rows]
+
+    province_map = {
+        '京': '北京', '津': '天津', '沪': '上海', '渝': '重庆',
+        '冀': '河北', '豫': '河南', '云': '云南', '辽': '辽宁',
+        '黑': '黑龙江', '湘': '湖南', '皖': '安徽', '鲁': '山东',
+        '新': '新疆', '苏': '江苏', '浙': '浙江', '赣': '江西',
+        '鄂': '湖北', '桂': '广西', '甘': '甘肃', '晋': '山西',
+        '蒙': '内蒙古', '陕': '陕西', '吉': '吉林', '闽': '福建',
+        '贵': '贵州', '粤': '广东', '川': '四川', '青': '青海',
+        '琼': '海南', '宁': '宁夏', '藏': '西藏',
+    }
+
+    province_count = {}
+    for item in data:
+        name = item['market_name']
+        count = item['count']
+        for short, full in province_map.items():
+            if short in name:
+                province_count[full] = province_count.get(full, 0) + count
+
+    result = [{"name": k, "value": v} for k, v in province_count.items()]
+    result.sort(key=lambda x: x['value'], reverse=True)
+    return result
+@router.get('/wordcloud', name='词云数据')
+async def get_wordcloud(
+    session: Annotated[AsyncSession, Depends(database_deps.get_db)],
+    user: Annotated[UserModel, Depends(auth_deps.get_auth_user)],
+):
+    sql = """
+        SELECT p.name as product_name, COUNT(*) as count
+        FROM price_records pr
+        JOIN products p ON pr.product_id = p.id
+        GROUP BY p.name
+        ORDER BY count DESC
+        LIMIT 80
+    """
+    rows = await session.execute(text(sql))
+    return [{"name": r.product_name, "value": int(r.count)} for r in rows]
+
+
+@router.get('/volatility-trend', name='波动Top8产品30天走势')
+async def get_volatility_trend(
+    session: Annotated[AsyncSession, Depends(database_deps.get_db)],
+    user: Annotated[UserModel, Depends(auth_deps.get_auth_user)],
+):
+    # 先取波动最大的Top8产品名
+    top_sql = """
+        SELECT p.name as product_name
+        FROM price_records pr
+        JOIN products p ON pr.product_id = p.id
+        GROUP BY p.name
+        HAVING AVG(pr.avg_price) > 0
+        ORDER BY ((MAX(pr.max_price) - MIN(pr.min_price)) / NULLIF(AVG(pr.avg_price), 0)) DESC
+        LIMIT 8
+    """
+    top_rows = await session.execute(text(top_sql))
+    top_products = [r.product_name for r in top_rows]
+
+    if not top_products:
+        return []
+
+    # 取这8个产品近30天每日均价
+    detail_sql = """
+        SELECT p.name as product_name, DATE(pr.time) as date,
+               ROUND(AVG(pr.avg_price)::numeric, 2) as avg_price
+        FROM price_records pr
+        JOIN products p ON pr.product_id = p.id
+        WHERE p.name = ANY(:names)
+          AND pr.time >= NOW() - INTERVAL '30 days'
+        GROUP BY p.name, DATE(pr.time)
+        ORDER BY p.name, date ASC
+    """
+    rows = await session.execute(text(detail_sql), {"names": top_products})
+    data = [dict(r._mapping) for r in rows]
+
+    # 按产品分组
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    dates = sorted(set(str(r['date']) for r in data))
+    for r in data:
+        grouped[r['product_name']].append({
+            "date": str(r['date']),
+            "price": float(r['avg_price'])
+        })
+
+    return {
+        "dates": dates,
+        "series": [
+            {"name": name, "data": grouped[name]}
+            for name in top_products if name in grouped
+        ]
+    }
+    

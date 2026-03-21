@@ -11,26 +11,58 @@
             <div style="text-align:center">
               <div style="font-size:32px">🏪</div>
               <div style="font-size:16px;font-weight:bold;margin:10px 0">新发地批发市场</div>
-              <div style="color:#999;font-size:13px;margin-bottom:15px">
-                北京新发地农产品批发市场
-              </div>
-              <el-tag v-if="task.status === 'running'" type="warning">抓取中...</el-tag>
+              <div style="color:#999;font-size:13px;margin-bottom:15px">北京新发地农产品批发市场</div>
+
+              <el-tag v-if="task.status === 'cancelled'" type="info">已取消</el-tag>
+              <el-tag v-else-if="task.paused" type="warning">已暂停</el-tag>
+              <el-tag v-else-if="task.status === 'running'" type="warning">抓取中...</el-tag>
               <el-tag v-else-if="task.status === 'success'" type="success">上次成功</el-tag>
               <el-tag v-else-if="task.status === 'failed'" type="danger">上次失败</el-tag>
               <el-tag v-else type="info">未运行</el-tag>
 
-              <div v-if="task.result" style="margin-top:10px;font-size:13px;color:#666">
-                新增 {{ task.result.total_saved }} 条 / 跳过 {{ task.result.total_skipped }} 条
+              <div v-if="task.status === 'running' || task.status === 'success' || task.status === 'cancelled'"
+                style="margin-top:10px;font-size:13px;color:#666">
+                <span v-if="task.total_pages > 0">
+                  第 {{ task.page }}/{{ task.total_pages }} 页 ·
+                </span>
+                已存入 <b style="color:#67c23a">{{ task.saved }}</b> 条 ·
+                跳过 <b style="color:#e6a23c">{{ task.skipped }}</b> 条
               </div>
 
-              <el-button
-                type="primary"
-                style="width:100%;margin-top:15px"
-                :loading="task.status === 'running'"
-                @click="triggerCrawl"
-              >
-                {{ task.status === 'running' ? '抓取中...' : '开始抓取' }}
-              </el-button>
+              <el-progress
+                v-if="task.status === 'running' && task.total_pages > 0"
+                :percentage="Math.round(task.page / task.total_pages * 100)"
+                style="margin-top:10px"
+              />
+
+              <div style="margin-top:15px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+                <el-button
+                  v-if="task.status !== 'running' || task.paused"
+                  type="primary"
+                  style="flex:1;min-width:90px"
+                  @click="task.paused ? resumeCrawl() : triggerCrawl()"
+                >
+                  {{ task.paused ? '继续抓取' : '开始抓取' }}
+                </el-button>
+
+                <el-button
+                  v-if="task.status === 'running' && !task.paused"
+                  type="warning"
+                  style="flex:1;min-width:90px"
+                  @click="pauseCrawl"
+                >
+                  暂停
+                </el-button>
+
+                <el-button
+                  v-if="task.status === 'running'"
+                  type="danger"
+                  style="flex:1;min-width:90px"
+                  @click="cancelCrawl"
+                >
+                  取消
+                </el-button>
+              </div>
             </div>
           </el-card>
         </el-col>
@@ -40,10 +72,18 @@
     <el-card style="margin-top:20px">
       <template #header>
         <span>📋 运行日志</span>
+        <el-button size="small" style="float:right" @click="logs = []">清空</el-button>
       </template>
-      <div style="background:#1e1e1e;padding:15px;border-radius:6px;min-height:150px;max-height:300px;overflow-y:auto">
+      <div
+        ref="logBox"
+        style="background:#1e1e1e;padding:15px;border-radius:6px;min-height:150px;max-height:300px;overflow-y:auto"
+      >
         <div v-if="logs.length === 0" style="color:#666">暂无日志...</div>
-        <div v-for="(log, i) in logs" :key="i" :style="{color: log.color, fontSize:'13px', marginBottom:'4px'}">
+        <div
+          v-for="(log, i) in logs"
+          :key="i"
+          :style="{ color: log.color, fontSize: '13px', marginBottom: '4px' }"
+        >
           {{ log.text }}
         </div>
       </div>
@@ -52,50 +92,110 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, nextTick } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
 
-const task = ref({ status: 'idle', result: null })
+const task = ref({
+  status: 'idle',
+  result: null,
+  saved: 0,
+  skipped: 0,
+  page: 0,
+  total_pages: 0,
+  paused: false,
+})
 const logs = ref([])
+const logBox = ref()
 let pollTimer = null
+let currentTaskId = null
 
 const addLog = (text, color = '#fff') => {
   const time = new Date().toLocaleTimeString()
   logs.value.push({ text: `[${time}] ${text}`, color })
+  nextTick(() => {
+    if (logBox.value) logBox.value.scrollTop = logBox.value.scrollHeight
+  })
+}
+
+const startPolling = (taskId) => {
+  clearInterval(pollTimer)
+  pollTimer = setInterval(async () => {
+    const status = await request.get(`/api/crawl/status/${taskId}`)
+    task.value = { ...task.value, ...status }
+
+    if (status.status === 'running') {
+      if (status.paused) {
+        // 暂停中不刷日志
+      } else if (status.total_pages > 0) {
+        addLog(
+          `第 ${status.page}/${status.total_pages} 页 · 已存入 ${status.saved} 条 · 跳过 ${status.skipped} 条`,
+          '#e6a23c'
+        )
+      } else {
+        addLog('正在抓取中...', '#e6a23c')
+      }
+    } else if (status.status === 'success') {
+      clearInterval(pollTimer)
+      addLog(`✅ 抓取完成！共存入 ${status.saved} 条，跳过 ${status.skipped} 条`, '#67c23a')
+      ElMessage.success('抓取成功')
+    } else if (status.status === 'cancelled') {
+      clearInterval(pollTimer)
+      addLog(`⛔ 已取消，本次共存入 ${status.saved} 条，跳过 ${status.skipped} 条`, '#909399')
+      ElMessage.info('已取消抓取')
+    } else if (status.status === 'failed') {
+      clearInterval(pollTimer)
+      addLog(`❌ 抓取失败: ${status.result}`, '#f56c6c')
+      ElMessage.error('抓取失败')
+    }
+  }, 2000)
 }
 
 const triggerCrawl = async () => {
   try {
-    task.value = { status: 'running', result: null }
+    task.value = { status: 'running', result: null, saved: 0, skipped: 0, page: 0, total_pages: 0, paused: false }
     addLog('开始触发新发地爬虫...', '#67c23a')
-
     const res = await request.post('/api/crawl/xinfadi')
-    const taskId = res.task_id
-    addLog(`任务ID: ${taskId}`, '#909399')
-
-    pollTimer = setInterval(async () => {
-      const status = await request.get(`/api/crawl/status/${taskId}`)
-
-      if (status.status === 'success') {
-        clearInterval(pollTimer)
-        task.value = { status: 'success', result: status.result }
-        addLog(`抓取完成！新增 ${status.result.total_saved} 条，跳过 ${status.result.total_skipped} 条`, '#67c23a')
-        ElMessage.success('抓取成功')
-      } else if (status.status === 'failed') {
-        clearInterval(pollTimer)
-        task.value = { status: 'failed', result: null }
-        addLog(`抓取失败: ${status.result}`, '#f56c6c')
-        ElMessage.error('抓取失败')
-      } else {
-        addLog('正在抓取中...', '#e6a23c')
-      }
-    }, 2000)
-
+    currentTaskId = res.task_id
+    addLog(`任务ID: ${currentTaskId}`, '#909399')
+    startPolling(currentTaskId)
   } catch (e) {
-    task.value = { status: 'failed', result: null }
+    task.value.status = 'failed'
     addLog('请求失败，请检查后端服务', '#f56c6c')
     ElMessage.error('请求失败')
+  }
+}
+
+const pauseCrawl = async () => {
+  if (!currentTaskId) return
+  await request.post(`/api/crawl/pause/${currentTaskId}`)
+  task.value.paused = true
+  addLog('⏸ 已暂停抓取', '#e6a23c')
+}
+
+const resumeCrawl = async () => {
+  if (!currentTaskId) return
+  await request.post(`/api/crawl/resume/${currentTaskId}`)
+  task.value.paused = false
+  addLog('▶️ 继续抓取...', '#67c23a')
+}
+
+const cancelCrawl = async () => {
+  if (!currentTaskId) return
+  try {
+    await ElMessageBox.confirm('确认取消本次抓取任务？已存入的数据不会丢失。', '取消确认', {
+      type: 'warning',
+      confirmButtonText: '确认取消',
+      cancelButtonText: '继续抓取',
+    })
+    await request.post(`/api/crawl/cancel/${currentTaskId}`)
+    clearInterval(pollTimer)
+    task.value.status = 'cancelled'
+    task.value.paused = false
+    addLog('⛔ 用户取消了抓取任务', '#909399')
+    ElMessage.info('已取消')
+  } catch {
+    // 用户点了"继续抓取"，不做任何处理
   }
 }
 </script>
