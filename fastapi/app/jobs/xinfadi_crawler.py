@@ -75,8 +75,8 @@ class XinfadiCrawler(BaseCrawler):
                 # 4. 插入价格记录（重复跳过）
                 pub_date = datetime.strptime(item["pub_date"], "%Y-%m-%d %H:%M:%S")
                 result = await self.session.execute(text("""
-                    INSERT INTO price_records (time, product_id, market_id, price, min_price, max_price, avg_price, source)
-                    VALUES (:time, :product_id, :market_id, :price, :min_price, :max_price, :avg_price, :source)
+                    INSERT INTO price_records (time, product_id, market_id, price, min_price, max_price, avg_price, source, spec_info, unit_info)
+                    VALUES (:time, :product_id, :market_id, :price, :min_price, :max_price, :avg_price, :source, :spec_info, :unit_info)
                     ON CONFLICT DO NOTHING
                     RETURNING time
                 """), {
@@ -87,7 +87,9 @@ class XinfadiCrawler(BaseCrawler):
                     "min_price": item["low_price"],
                     "max_price": item["high_price"],
                     "avg_price": item["avg_price"],
-                    "source": "xinfadi"
+                    "source": "xinfadi",
+                    "spec_info": item["spec_info"],
+                    "unit_info": item["unit_info"]
                 })
 
                 if result.fetchone():

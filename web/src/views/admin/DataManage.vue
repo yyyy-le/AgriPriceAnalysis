@@ -75,6 +75,8 @@
                   <span style="color:#94a3b8;font-size:13px">正在加载历史记录...</span>
                 </template>
                 <el-table-column prop="date" label="日期" min-width="100"/>
+                <el-table-column prop="spec_info" label="规格" min-width="100"/>
+                <el-table-column prop="unit_info" label="单位" min-width="70"/>
                 <el-table-column prop="market_name" label="市场/产地" min-width="120"/>
                 <el-table-column label="均价" min-width="90">
                   <template #default="{ row: r }">

@@ -29,6 +29,8 @@
         </el-table-column>
         <el-table-column prop="product_name" label="产品名称" min-width="120"/>
         <el-table-column prop="category_name" label="分类" min-width="90"/>
+        <el-table-column prop="spec_info" label="规格" min-width="100"/>
+        <el-table-column prop="unit_info" label="单位" min-width="70"/>
         <el-table-column prop="market_name" label="市场/产地" min-width="120"/>
         <el-table-column prop="avg_price" label="均价" min-width="90">
           <template #default="{ row }">
@@ -41,7 +43,6 @@
         <el-table-column prop="max_price" label="最高价" min-width="90">
           <template #default="{ row }">{{ row.max_price?.toFixed(2) }}</template>
         </el-table-column>
-        <el-table-column prop="unit" label="单位" min-width="70"/>
       </el-table>
 
       <el-pagination

@@ -3,7 +3,7 @@
       <el-card style="margin-bottom:16px">
       <el-row :gutter="12" align="middle">
         <el-col :span="10">
-          <el-input v-model="keyword" placeholder="搜索用户名/手机号/昵称" clearable @change="fetchData"/>
+          <el-input v-model="keyword" placeholder="搜索用户名/手机号" clearable @change="fetchData"/>
         </el-col>
         <el-col :span="4">
           <el-button type="primary" @click="fetchData">搜索</el-button>
@@ -18,13 +18,7 @@
     <el-card>
       <el-table :data="list" stripe v-loading="loading" style="width:100%">
         <el-table-column prop="username" label="用户名" width="120"/>
-        <el-table-column prop="nickname" label="昵称" width="120"/>
         <el-table-column prop="cellphone" label="手机号" width="140"/>
-        <el-table-column prop="gender" label="性别" width="70">
-          <template #default="{ row }">
-            {{ row.gender === 'male' ? '男' : row.gender === 'female' ? '女' : '未知' }}
-          </template>
-        </el-table-column>
         <el-table-column prop="state" label="状态" width="80">
           <template #default="{ row }">
             <el-tag :type="row.state === 'enabled' ? 'success' : 'danger'" size="small">
@@ -74,22 +68,12 @@
         <el-form-item label="用户名" prop="username">
           <el-input v-model="form.username" :disabled="isEdit" placeholder="登录用户名"/>
         </el-form-item>
-        <el-form-item label="昵称" prop="nickname">
-          <el-input v-model="form.nickname" placeholder="显示昵称"/>
-        </el-form-item>
         <el-form-item label="手机号" prop="cellphone">
           <el-input v-model="form.cellphone" placeholder="11位手机号"/>
         </el-form-item>
         <el-form-item label="密码" :prop="isEdit ? '' : 'password'">
           <el-input v-model="form.password" type="password" show-password
             :placeholder="isEdit ? '不填则不修改密码' : '请输入密码'"/>
-        </el-form-item>
-        <el-form-item label="性别">
-          <el-radio-group v-model="form.gender">
-            <el-radio value="male">男</el-radio>
-            <el-radio value="female">女</el-radio>
-            <el-radio value="unknown">未知</el-radio>
-          </el-radio-group>
         </el-form-item>
         <el-form-item label="角色">
           <el-switch v-model="form.is_admin" active-text="管理员" inactive-text="普通用户"/>
@@ -125,10 +109,8 @@ const formRef = ref()
 const defaultForm = () => ({
   id: null,
   username: '',
-  nickname: '',
   cellphone: '',
   password: '',
-  gender: 'unknown',
   is_admin: false,
   enabled: true,
 })
@@ -137,7 +119,6 @@ const form = ref(defaultForm())
 
 const rules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  nickname: [{ required: true, message: '请输入昵称', trigger: 'blur' }],
   cellphone: [
     { required: true, message: '请输入手机号', trigger: 'blur' },
     { pattern: /^1[3456789]\d{9}$/, message: '手机号格式不正确', trigger: 'blur' }
@@ -169,10 +150,8 @@ const openEdit = (row) => {
   form.value = {
     id: row.id,
     username: row.username,
-    nickname: row.nickname,
     cellphone: row.cellphone,
     password: '',
-    gender: row.gender,
     is_admin: row.is_admin,
     enabled: row.state === 'enabled',
   }

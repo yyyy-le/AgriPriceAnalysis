@@ -159,7 +159,8 @@ async def get_price_list(
 
     sql = f"""
         SELECT pr.time, p.name as product_name, c.name as category_name,
-               m.name as market_name, pr.min_price, pr.max_price, pr.avg_price, p.unit
+               pr.spec_info, pr.unit_info, m.name as market_name,
+               pr.min_price, pr.max_price, pr.avg_price, p.unit
         FROM price_records pr
         JOIN products p ON pr.product_id = p.id
         JOIN categories c ON p.category_id = c.id

@@ -26,8 +26,6 @@ async def register_user(
     await validation_service.validate_username_availability(session, user_create.username)
     # 验证手机号
     await validation_service.validate_cellphone_availability(session, user_create.cellphone)
-    # 验证验证码
-    await verification_code_service.verify_code(user_create.cellphone, user_create.cellphone_verification_code)
 
     await create_user(session, client_ip, user_create)
     await session.commit()

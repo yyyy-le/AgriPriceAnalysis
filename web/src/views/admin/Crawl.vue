@@ -29,12 +29,6 @@
                 跳过 <b style="color:#e6a23c">{{ task.skipped }}</b> 条
               </div>
 
-              <el-progress
-                v-if="task.status === 'running' && task.total_pages > 0"
-                :percentage="Math.round(task.page / task.total_pages * 100)"
-                style="margin-top:10px"
-              />
-
               <div style="margin-top:15px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
                 <el-button
                   v-if="task.status !== 'running' || task.paused"
@@ -92,7 +86,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
 
@@ -110,9 +104,66 @@ const logBox = ref()
 let pollTimer = null
 let currentTaskId = null
 
+// 页面恢复：从 sessionStorage 读取上次正在运行的 task_id
+const restoreTaskId = async () => {
+  restoreLogs()
+  const saved = sessionStorage.getItem('crawl_task_id')
+  if (saved) {
+    currentTaskId = saved
+    // 立即获取一次状态，避免显示空状态
+    try {
+      const status = await request.get(`/api/crawl/status/${currentTaskId}`)
+      task.value = { ...task.value, ...status }
+      // 任务已结束则不再轮询
+      if (['success', 'cancelled', 'failed'].includes(status.status)) {
+        clearSavedTaskId()
+        return
+      }
+    } catch {
+      clearSavedTaskId()
+      return
+    }
+    startPolling(currentTaskId)
+  }
+}
+
+onMounted(() => {
+  restoreTaskId()
+})
+
+onUnmounted(() => {
+  // 导航离开前清理定时器，保存 task_id
+  if (pollTimer) clearInterval(pollTimer)
+})
+
+const saveTaskId = (id) => {
+  sessionStorage.setItem('crawl_task_id', id)
+}
+
+const clearSavedTaskId = () => {
+  sessionStorage.removeItem('crawl_task_id')
+  sessionStorage.removeItem('crawl_logs')
+}
+
+const saveLogs = () => {
+  // 最多保存 200 条日志，避免超出 sessionStorage 容量
+  const slice = logs.value.slice(-200)
+  sessionStorage.setItem('crawl_logs', JSON.stringify(slice))
+}
+
+const restoreLogs = () => {
+  const saved = sessionStorage.getItem('crawl_logs')
+  if (saved) {
+    try {
+      logs.value = JSON.parse(saved)
+    } catch {}
+  }
+}
+
 const addLog = (text, color = '#fff') => {
   const time = new Date().toLocaleTimeString()
   logs.value.push({ text: `[${time}] ${text}`, color })
+  saveLogs()
   nextTick(() => {
     if (logBox.value) logBox.value.scrollTop = logBox.value.scrollHeight
   })
@@ -137,14 +188,17 @@ const startPolling = (taskId) => {
       }
     } else if (status.status === 'success') {
       clearInterval(pollTimer)
+      clearSavedTaskId()
       addLog(`✅ 抓取完成！共存入 ${status.saved} 条，跳过 ${status.skipped} 条`, '#67c23a')
       ElMessage.success('抓取成功')
     } else if (status.status === 'cancelled') {
       clearInterval(pollTimer)
+      clearSavedTaskId()
       addLog(`⛔ 已取消，本次共存入 ${status.saved} 条，跳过 ${status.skipped} 条`, '#909399')
       ElMessage.info('已取消抓取')
     } else if (status.status === 'failed') {
       clearInterval(pollTimer)
+      clearSavedTaskId()
       addLog(`❌ 抓取失败: ${status.result}`, '#f56c6c')
       ElMessage.error('抓取失败')
     }
@@ -157,6 +211,7 @@ const triggerCrawl = async () => {
     addLog('开始触发新发地爬虫...', '#67c23a')
     const res = await request.post('/api/crawl/xinfadi')
     currentTaskId = res.task_id
+    saveTaskId(currentTaskId)
     addLog(`任务ID: ${currentTaskId}`, '#909399')
     startPolling(currentTaskId)
   } catch (e) {
@@ -190,6 +245,7 @@ const cancelCrawl = async () => {
     })
     await request.post(`/api/crawl/cancel/${currentTaskId}`)
     clearInterval(pollTimer)
+    clearSavedTaskId()
     task.value.status = 'cancelled'
     task.value.paused = false
     addLog('⛔ 用户取消了抓取任务', '#909399')

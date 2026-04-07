@@ -314,7 +314,7 @@ async def get_price_records(
         sql = f"""
             SELECT
                 pr.time, pr.product_id, pr.min_price, pr.max_price,
-                pr.avg_price, pr.source, m.name as market_name
+                pr.avg_price, pr.source, pr.spec_info, pr.unit_info, m.name as market_name
             FROM price_records pr
             LEFT JOIN markets m ON pr.market_id = m.id
             WHERE pr.product_id = :product_id
@@ -342,7 +342,7 @@ async def get_price_records(
     sql = f"""
         SELECT pr.time, pr.product_id, p.name as product_name,
                c.name as category_name, m.name as market_name,
-               pr.min_price, pr.max_price, pr.avg_price, p.unit, pr.source
+               pr.min_price, pr.max_price, pr.avg_price, pr.spec_info, pr.unit_info, pr.source
         FROM price_records pr
         JOIN products p ON pr.product_id = p.id
         JOIN categories c ON p.category_id = c.id

@@ -88,54 +88,16 @@
               />
             </el-form-item>
 
-            <!-- 昵称 -->
-            <el-form-item prop="nickname">
-              <div class="input-label">昵称</div>
-              <el-input
-                v-model="regForm.nickname"
-                placeholder="如何称呼您"
-                size="large"
-                prefix-icon="Avatar"
-                class="custom-input"
-              />
-            </el-form-item>
-
-            <!-- 手机号 + 发送验证码 -->
+            <!-- 手机号 -->
             <el-form-item prop="cellphone">
               <div class="input-label">手机号</div>
-              <div class="phone-row">
-                <el-input
-                  v-model="regForm.cellphone"
-                  placeholder="请输入11位手机号"
-                  size="large"
-                  prefix-icon="Phone"
-                  class="custom-input phone-input"
-                  maxlength="11"
-                />
-                <el-button
-                  size="large"
-                  class="code-btn"
-                  :disabled="codeSending || countdown > 0 || !isPhoneValid"
-                  :loading="codeSending"
-                  @click="handleSendCode"
-                >
-                  <span v-if="countdown > 0">{{ countdown }}s 后重发</span>
-                  <span v-else-if="codeSending">发送中</span>
-                  <span v-else>获取验证码</span>
-                </el-button>
-              </div>
-            </el-form-item>
-
-            <!-- 验证码 -->
-            <el-form-item prop="cellphone_verification_code">
-              <div class="input-label">验证码</div>
               <el-input
-                v-model="regForm.cellphone_verification_code"
-                placeholder="请输入6位验证码"
+                v-model="regForm.cellphone"
+                placeholder="请输入11位手机号"
                 size="large"
-                prefix-icon="Key"
+                prefix-icon="Phone"
                 class="custom-input"
-                maxlength="6"
+                maxlength="11"
               />
             </el-form-item>
 
@@ -179,22 +141,6 @@
               />
             </el-form-item>
 
-            <!-- 性别（可选） -->
-            <el-form-item>
-              <div class="input-label">性别（可选）</div>
-              <div class="gender-group">
-                <div
-                  v-for="item in genderOptions"
-                  :key="item.value"
-                  :class="['gender-item', { selected: regForm.gender === item.value }]"
-                  @click="regForm.gender = item.value"
-                >
-                  <span>{{ item.icon }}</span>
-                  <span>{{ item.label }}</span>
-                </div>
-              </div>
-            </el-form-item>
-
             <el-button
               type="primary"
               size="large"
@@ -215,20 +161,15 @@
       </transition>
     </div>
 
-    <!-- 底部提示：开发模式超级验证码 -->
-    <div class="dev-tip" v-if="showDevTip">
-      💡 开发模式：验证码为 <code>417938</code>
-      <span @click="showDevTip=false" style="cursor:pointer;margin-left:8px">×</span>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
-import { register, sendVerificationCode } from '../api/register'
+import { register } from '../api/register'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -270,28 +211,13 @@ const handleLogin = async () => {
 // ================== 注册 ==================
 const regRef = ref()
 const regLoading = ref(false)
-const codeSending = ref(false)
-const countdown = ref(0)
-let countdownTimer = null
 
 const regForm = ref({
   username: '',
-  nickname: '',
   cellphone: '',
-  cellphone_verification_code: '',
   password: '',
   confirmPassword: '',
-  gender: 'unknown',
 })
-
-const genderOptions = [
-  { value: 'male', label: '男', icon: '👦' },
-  { value: 'female', label: '女', icon: '👧' },
-  { value: 'unknown', label: '保密', icon: '🤫' },
-]
-
-// 手机号是否合法
-const isPhoneValid = computed(() => /^1[3456789]\d{9}$/.test(regForm.value.cellphone))
 
 // 密码强度
 const pwdStrength = computed(() => {
@@ -317,18 +243,9 @@ const regRules = {
     { min: 3, max: 20, message: '用户名3~20位', trigger: 'blur' },
     { pattern: /^[a-zA-Z0-9_]+$/, message: '只能包含字母、数字、下划线', trigger: 'blur' },
   ],
-  nickname: [
-    { required: true, message: '请输入昵称', trigger: 'blur' },
-    { min: 1, max: 20, message: '昵称1~20位', trigger: 'blur' },
-  ],
   cellphone: [
     { required: true, message: '请输入手机号', trigger: 'blur' },
     { pattern: /^1[3456789]\d{9}$/, message: '手机号格式不正确', trigger: 'blur' },
-  ],
-  cellphone_verification_code: [
-    { required: true, message: '请输入验证码', trigger: 'blur' },
-    { len: 6, message: '验证码为6位数字', trigger: 'blur' },
-    { pattern: /^\d{6}$/, message: '验证码为6位数字', trigger: 'blur' },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
@@ -339,32 +256,6 @@ const regRules = {
   ],
 }
 
-// 发送验证码
-const handleSendCode = async () => {
-  if (!isPhoneValid.value) {
-    ElMessage.warning('请先输入正确的手机号')
-    return
-  }
-  codeSending.value = true
-  try {
-    await sendVerificationCode(regForm.value.cellphone)
-    ElMessage.success('验证码已发送，请注意查收（开发环境：417938）')
-    // 倒计时 60 秒
-    countdown.value = 60
-    countdownTimer = setInterval(() => {
-      countdown.value--
-      if (countdown.value <= 0) {
-        clearInterval(countdownTimer)
-        countdown.value = 0
-      }
-    }, 1000)
-  } catch {
-    // 错误由 request.js 统一处理
-  } finally {
-    codeSending.value = false
-  }
-}
-
 // 注册
 const handleRegister = async () => {
   await regRef.value.validate(async (valid) => {
@@ -373,11 +264,8 @@ const handleRegister = async () => {
     try {
       await register({
         username: regForm.value.username,
-        nickname: regForm.value.nickname,
         cellphone: regForm.value.cellphone,
-        cellphone_verification_code: regForm.value.cellphone_verification_code,
         password: regForm.value.password,
-        gender: regForm.value.gender,
       })
       ElMessage.success('注册成功，请登录')
       // 切换到登录 Tab 并预填用户名
@@ -385,9 +273,10 @@ const handleRegister = async () => {
       switchTab('login')
       // 重置注册表单
       regForm.value = {
-        username: '', nickname: '', cellphone: '',
-        cellphone_verification_code: '', password: '',
-        confirmPassword: '', gender: 'unknown',
+        username: '',
+        cellphone: '',
+        password: '',
+        confirmPassword: '',
       }
     } catch {
       // 错误由 request.js 统一处理
@@ -397,9 +286,6 @@ const handleRegister = async () => {
   })
 }
 
-onUnmounted(() => {
-  if (countdownTimer) clearInterval(countdownTimer)
-})
 </script>
 
 <style scoped>
@@ -624,37 +510,6 @@ onUnmounted(() => {
 .strength-label.level-2 { color: #f59e0b; }
 .strength-label.level-3 { color: #3b82f6; }
 .strength-label.level-4 { color: #10b981; }
-
-/* 性别选择 */
-.gender-group {
-  display: flex;
-  gap: 8px;
-}
-.gender-item {
-  flex: 1;
-  padding: 8px 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 13px;
-  color: #64748b;
-  transition: all 0.2s;
-  user-select: none;
-}
-.gender-item:hover {
-  border-color: rgba(99,102,241,0.4);
-  color: #94a3b8;
-}
-.gender-item.selected {
-  border-color: #6366f1;
-  background: rgba(99,102,241,0.15);
-  color: #c7d2fe;
-}
 
 /* 提交按钮 */
 .submit-btn {

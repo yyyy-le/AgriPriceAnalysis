@@ -22,7 +22,7 @@ class BaseCrawler(ABC):
         total_saved = 0
         total_skipped = 0
         self._cancelled = False
-        limit = 10
+        limit = 100
 
         try:
             first = await self.fetch(page=1, limit=limit)
@@ -45,9 +45,10 @@ class BaseCrawler(ABC):
                 if self.on_progress:
                     await self.on_progress(page, total_pages, total_saved, total_skipped)
 
-                if saved == 0 and skipped > 0:
-                    logger.info(f"[{self.source_name}] 检测到重复数据，停止抓取")
-                    break
+                # TODO: 重复检测暂时关闭，待完善检测逻辑后重新启用
+                # if saved == 0 and skipped > 0:
+                #     logger.info(f"[{self.source_name}] 检测到重复数据，停止抓取")
+                #     break
 
         except Exception as e:
             logger.error(f"[{self.source_name}] 爬虫异常: {e}")
