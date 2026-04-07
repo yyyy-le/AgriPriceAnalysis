@@ -30,13 +30,13 @@ async def get_users(
     where_clauses = ["1=1"]
 
     if keyword:
-        where_clauses.append("(username ILIKE :keyword OR cellphone ILIKE :keyword OR nickname ILIKE :keyword)")
+        where_clauses.append("(username ILIKE :keyword OR cellphone ILIKE :keyword)")
         params["keyword"] = f"%{keyword}%"
 
     where = " AND ".join(where_clauses)
 
     sql = f"""
-        SELECT id, username, nickname, cellphone, state, gender, is_admin, created_at
+        SELECT id, username, cellphone, state, is_admin, created_at
         FROM users
         WHERE {where}
         ORDER BY created_at DESC
@@ -61,10 +61,8 @@ async def create_user_by_admin(
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
     admin: Annotated[UserModel, Depends(require_admin)],
     username: str = Body(...),
-    nickname: str = Body(...),
     cellphone: str = Body(...),
     password: str = Body(...),
-    gender: str = Body('unknown'),
     is_admin: bool = Body(False),
     enabled: bool = Body(True),
 ):
@@ -87,11 +85,11 @@ async def create_user_by_admin(
     hashed = get_password_hash(password)
     state = 'enabled' if enabled else 'disabled'
     await session.execute(text("""
-        INSERT INTO users (id, username, nickname, password, cellphone, state, gender, avatar, is_admin)
-        VALUES (gen_random_uuid(), :username, :nickname, :password, :cellphone, :state, :gender, '', :is_admin)
+        INSERT INTO users (id, username, password, cellphone, state, avatar, is_admin)
+        VALUES (gen_random_uuid(), :username, :password, :cellphone, :state, '', :is_admin)
     """), {
-        "username": username, "nickname": nickname, "password": hashed,
-        "cellphone": cellphone, "state": state, "gender": gender, "is_admin": is_admin
+        "username": username, "password": hashed,
+        "cellphone": cellphone, "state": state, "is_admin": is_admin
     })
     await session.commit()
     return {"success": True}
@@ -102,10 +100,8 @@ async def update_user_by_admin(
     user_id: str,
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
     admin: Annotated[UserModel, Depends(require_admin)],
-    nickname: str = Body(...),
     cellphone: str = Body(...),
     password: str = Body(''),
-    gender: str = Body('unknown'),
     is_admin: bool = Body(False),
     enabled: bool = Body(True),
 ):
@@ -122,20 +118,20 @@ async def update_user_by_admin(
 
     if password:
         await session.execute(text("""
-            UPDATE users SET nickname=:nickname, cellphone=:cellphone, password=:password,
-            gender=:gender, is_admin=:is_admin, state=:state WHERE id=:id
+            UPDATE users SET cellphone=:cellphone, password=:password,
+            is_admin=:is_admin, state=:state WHERE id=:id
         """), {
-            "nickname": nickname, "cellphone": cellphone,
+            "cellphone": cellphone,
             "password": get_password_hash(password),
-            "gender": gender, "is_admin": is_admin, "state": state, "id": user_id
+            "is_admin": is_admin, "state": state, "id": user_id
         })
     else:
         await session.execute(text("""
-            UPDATE users SET nickname=:nickname, cellphone=:cellphone,
-            gender=:gender, is_admin=:is_admin, state=:state WHERE id=:id
+            UPDATE users SET cellphone=:cellphone,
+            is_admin=:is_admin, state=:state WHERE id=:id
         """), {
-            "nickname": nickname, "cellphone": cellphone,
-            "gender": gender, "is_admin": is_admin, "state": state, "id": user_id
+            "cellphone": cellphone,
+            "is_admin": is_admin, "state": state, "id": user_id
         })
 
     await session.commit()

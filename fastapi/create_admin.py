@@ -12,8 +12,8 @@ async def main():
     async with async_session() as session:
         hashed = get_password_hash('admin')
         await session.execute(text("""
-            INSERT INTO users (id, username, nickname, password, cellphone, state, gender, avatar, is_admin)
-            VALUES (gen_random_uuid(), 'admin', '管理员', :password, '13800000000', 'enabled', 'unknown', '', true)
+            INSERT INTO users (id, username, password, cellphone, state, avatar, is_admin)
+            VALUES (gen_random_uuid(), 'admin', :password, '13800000000', 'enabled', '', true)
             ON CONFLICT (username) DO UPDATE SET password = :password, cellphone = '13800000000', is_admin = true
         """), {"password": hashed})
         await session.commit()

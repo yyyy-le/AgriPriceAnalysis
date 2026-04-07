@@ -8,6 +8,3 @@ from typing import Literal
 
 # 用户状态
 USER_STATE_TYPE = Literal['disabled', 'enabled']
-
-# 性别
-GENDER_TYPE = Literal['male', 'female', 'unknown']
