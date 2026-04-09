@@ -25,7 +25,7 @@ import { getLogs } from '../../api/admin'
 const list = ref([])
 const loading = ref(false)
 
-const formatDate = (d) => d ? new Date(d).toLocaleString('zh-CN') : '-'
+const formatDate = (d) => d ? new Date(d).toLocaleDateString('zh-CN') : '-'
 
 onMounted(async () => {
   loading.value = true

@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+import asyncio
+import random
 import logging
 
 logger = logging.getLogger(__name__)
@@ -18,19 +20,21 @@ class BaseCrawler(ABC):
     async def parse(self, raw_data: dict) -> list[dict]:
         pass
 
-    async def run(self) -> dict:
+    async def run(self, start_page: int = 1) -> dict:
         total_saved = 0
         total_skipped = 0
         self._cancelled = False
         limit = 100
 
         try:
-            first = await self.fetch(page=1, limit=limit)
-            total = first.get('count', 0)
-            total_pages = (total + limit - 1) // limit
-            logger.info(f"[{self.source_name}] 共 {total} 条数据，{total_pages} 页")
+            # first = await self.fetch(page=start_page, limit=limit)
+            # total = first.get('count', 0)
+            # total_pages = (total + limit - 1) // limit
+            # logger.info(f"[{self.source_name}] 共 {total} 条数据，{total_pages} 页")
+            total_pages = 1200  # 手动设置总页数，按需调整
+            logger.info(f"[{self.source_name}] 从第 {start_page} 页开始，共 {total_pages} 页")
 
-            for page in range(1, total_pages + 1):
+            for page in range(start_page, total_pages + 1):
                 if self._cancelled:
                     logger.info(f"[{self.source_name}] 任务已取消")
                     break
@@ -44,6 +48,9 @@ class BaseCrawler(ABC):
 
                 if self.on_progress:
                     await self.on_progress(page, total_pages, total_saved, total_skipped)
+
+                if page < total_pages:
+                    await asyncio.sleep(random.uniform(1, 3))
 
                 # TODO: 重复检测暂时关闭，待完善检测逻辑后重新启用
                 # if saved == 0 and skipped > 0:

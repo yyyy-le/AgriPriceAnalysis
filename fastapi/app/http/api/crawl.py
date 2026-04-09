@@ -2,7 +2,7 @@ from typing import Annotated
 import uuid
 import asyncio
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Body, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.http.deps import database_deps
@@ -15,7 +15,7 @@ crawl_pause_events = {}
 crawl_crawlers = {}  # 持有 crawler 引用，用于取消
 
 
-async def run_crawl_task(task_id: str, session: AsyncSession):
+async def run_crawl_task(task_id: str, session: AsyncSession, start_page: int = 1):
     pause_event = crawl_pause_events.get(task_id)
     try:
         crawl_status[task_id].update({
@@ -40,7 +40,7 @@ async def run_crawl_task(task_id: str, session: AsyncSession):
             })
 
         crawler.on_progress = on_progress
-        result = await crawler.run()
+        result = await crawler.run(start_page=start_page)
 
         if result.get("cancelled"):
             crawl_status[task_id].update({
@@ -69,6 +69,7 @@ async def run_crawl_task(task_id: str, session: AsyncSession):
 async def trigger_xinfadi(
     background_tasks: BackgroundTasks,
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
+    start_page: int = Body(1, embed=True),
 ):
     task_id = str(uuid.uuid4())
     pause_event = asyncio.Event()
@@ -83,7 +84,7 @@ async def trigger_xinfadi(
         "total_pages": 0,
         "paused": False,
     }
-    background_tasks.add_task(run_crawl_task, task_id, session)
+    background_tasks.add_task(run_crawl_task, task_id, session, start_page)
     return {"task_id": task_id, "status": "started"}
 
 

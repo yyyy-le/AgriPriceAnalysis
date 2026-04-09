@@ -29,7 +29,19 @@
                 跳过 <b style="color:#e6a23c">{{ task.skipped }}</b> 条
               </div>
 
-              <div style="margin-top:15px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+              <div style="margin-top:10px;display:flex;align-items:center;justify-content:center;gap:8px">
+                <span v-if="task.status !== 'running' || task.paused" style="font-size:13px;color:#666">起始页</span>
+                <el-input-number
+                  v-if="task.status !== 'running' || task.paused"
+                  v-model="startPage"
+                  :min="1"
+                  :max="9999"
+                  size="small"
+                  style="width:100px"
+                />
+              </div>
+
+              <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
                 <el-button
                   v-if="task.status !== 'running' || task.paused"
                   type="primary"
@@ -90,6 +102,7 @@ import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
 
+const startPage = ref(1)
 const task = ref({
   status: 'idle',
   result: null,
@@ -178,20 +191,21 @@ const addLog = (text, color = '#fff') => {
 
 const startPolling = (taskId) => {
   clearInterval(pollTimer)
+  let lastProgress = ''
   pollTimer = setInterval(async () => {
     const status = await request.get(`/api/crawl/status/${taskId}`)
     task.value = { ...task.value, ...status }
 
     if (status.status === 'running') {
-      if (status.paused) {
-        // 暂停中不刷日志
-      } else if (status.total_pages > 0) {
-        addLog(
-          `第 ${status.page}/${status.total_pages} 页 · 已存入 ${status.saved} 条 · 跳过 ${status.skipped} 条`,
-          '#e6a23c'
-        )
-      } else {
-        addLog('正在抓取中...', '#e6a23c')
+      if (!status.paused && status.total_pages > 0) {
+        const progress = `${status.page}/${status.total_pages}/${status.saved}/${status.skipped}`
+        if (progress !== lastProgress) {
+          lastProgress = progress
+          addLog(
+            `第 ${status.page}/${status.total_pages} 页 · 已存入 ${status.saved} 条 · 跳过 ${status.skipped} 条`,
+            '#e6a23c'
+          )
+        }
       }
     } else if (status.status === 'success') {
       clearInterval(pollTimer)
@@ -216,7 +230,7 @@ const triggerCrawl = async () => {
   try {
     task.value = { status: 'running', result: null, saved: 0, skipped: 0, page: 0, total_pages: 0, paused: false }
     addLog('开始触发新发地爬虫...', '#67c23a')
-    const res = await request.post('/api/crawl/xinfadi')
+    const res = await request.post('/api/crawl/xinfadi', { start_page: startPage.value })
     currentTaskId = res.task_id
     saveTaskId(currentTaskId)
     addLog(`任务ID: ${currentTaskId}`, '#909399')
