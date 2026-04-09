@@ -20,14 +20,24 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # 将 cellphone 字段改为可空
+    # 将 cellphone 字段改为可空，保留唯一约束
     op.alter_column('users', 'cellphone',
                     existing_type=sa.String(length=45),
                     nullable=True)
+    # 确保唯一约束存在（之前可能被删除）
+    op.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'users_cellphone_key'
+            ) THEN
+                ALTER TABLE users ADD CONSTRAINT users_cellphone_key UNIQUE (cellphone);
+            END IF;
+        END $$;
+    """)
 
 
 def downgrade() -> None:
-    # 将 cellphone 字段改回非空
     op.alter_column('users', 'cellphone',
                     existing_type=sa.String(length=45),
                     nullable=False)

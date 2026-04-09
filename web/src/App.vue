@@ -167,8 +167,8 @@ const goProfile = () => {
   router.push('/profile')
 }
 
-const handleLogout = () => {
-  authStore.logout()
+const handleLogout = async () => {
+  await authStore.logout()
   window.location.href = '/login'
 }
 

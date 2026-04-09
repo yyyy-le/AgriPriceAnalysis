@@ -2,50 +2,33 @@
   <div>
     <!-- 搜索栏 -->
     <el-card style="margin-bottom:16px">
-      <el-row :gutter="12" align="middle">
-        <!-- 产品名称 -->
-        <el-col :span="5">
+      <el-row :gutter="10" align="middle">
+        <el-col :span="4">
           <el-input v-model="productName" placeholder="搜索产品名称" clearable @change="fetchData"/>
         </el-col>
-        <!-- 分类 -->
-        <el-col :span="4">
-          <el-select v-model="categoryId" placeholder="选择分类" clearable @change="fetchData" style="width:100%">
-            <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id"/>
+        <el-col :span="3">
+          <el-select v-model="parentCategoryId" placeholder="一级分类" clearable @change="onParentCatChange" style="width:100%">
+            <el-option v-for="c in parentCategories" :key="c.id" :label="c.name" :value="c.id"/>
           </el-select>
         </el-col>
-        <!-- 日期范围 -->
+        <el-col :span="3">
+          <el-select v-model="categoryId" placeholder="二级分类" clearable :disabled="!parentCategoryId" @change="fetchData" style="width:100%">
+            <el-option v-for="c in childCategories" :key="c.id" :label="c.name" :value="c.id"/>
+          </el-select>
+        </el-col>
         <el-col :span="4">
-          <el-date-picker
-            v-model="startDate"
-            type="date"
-            placeholder="开始日期"
-            style="width:100%"
-            value-format="YYYY-MM-DD"
-            clearable
-            @change="onDateChange"
-          />
+          <el-date-picker v-model="startDate" type="date" placeholder="开始日期" style="width:100%" value-format="YYYY-MM-DD" clearable @change="onDateChange"/>
         </el-col>
         <el-col :span="1" style="text-align:center;color:#c0c4cc;font-size:13px">至</el-col>
         <el-col :span="4">
-          <el-date-picker
-            v-model="endDate"
-            type="date"
-            placeholder="结束日期"
-            style="width:100%"
-            value-format="YYYY-MM-DD"
-            clearable
-            @change="onDateChange"
-          />
+          <el-date-picker v-model="endDate" type="date" placeholder="结束日期" style="width:100%" value-format="YYYY-MM-DD" clearable @change="onDateChange"/>
         </el-col>
-        <!-- 按钮 -->
-        <el-col :span="4">
+        <el-col :span="2" style="display:flex;gap:8px">
           <el-button type="primary" @click="fetchData">搜索</el-button>
           <el-button @click="handleReset">重置</el-button>
         </el-col>
-        <!-- 统计 -->
-        <el-col :span="2" style="text-align:right;white-space:nowrap">
-          <div style="font-size:12px;color:#909399">共 <b style="color:#409eff">{{ total }}</b> 个产品</div>
-          <div style="font-size:12px;color:#909399"><b style="color:#409eff">{{ totalRecords }}</b> 条记录</div>
+        <el-col :span="3" style="text-align:right;font-size:12px;color:#909399;white-space:nowrap">
+          共 <b style="color:#409eff">{{ total }}</b> 个产品 · <b style="color:#409eff">{{ totalRecords }}</b> 条记录
         </el-col>
       </el-row>
     </el-card>
@@ -110,9 +93,16 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="分类" min-width="80">
+        <el-table-column label="一级分类" min-width="80">
           <template #default="{ row }">
-            <el-tag size="small" type="info" effect="plain">{{ row.category_name }}</el-tag>
+            <el-tag size="small" type="info" effect="plain">{{ row.parent_category_name }}</el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="二级分类" min-width="80">
+          <template #default="{ row }">
+            <el-tag v-if="row.category_name" size="small" effect="plain">{{ row.category_name }}</el-tag>
+            <span v-else style="color:#c0c4cc;font-size:12px">-</span>
           </template>
         </el-table-column>
 
@@ -222,14 +212,27 @@ const loading = ref(false)
 const submitLoading = ref(false)
 const productName = ref('')
 const categoryId = ref(null)
+const parentCategoryId = ref(null)
 const startDate = ref(null)
 const endDate = ref(null)
 const categories = ref([])
 const page = ref(1)
 const pageSize = ref(20)
 const dialogVisible = ref(false)
-const expandedRowKeys = ref([]) // 当前展开行的 key 列表
+const expandedRowKeys = ref([])
 const form = ref({})
+
+const parentCategories = computed(() => categories.value.filter(c => !c.parent_id))
+const childCategories = computed(() =>
+  parentCategoryId.value
+    ? categories.value.filter(c => c.parent_id === parentCategoryId.value)
+    : []
+)
+
+const onParentCatChange = () => {
+  categoryId.value = null
+  fetchData()
+}
 
 const calcAvg = computed(() => {
   const min = form.value.min_price || 0
@@ -244,6 +247,7 @@ const onDateChange = () => {
 const handleReset = () => {
   productName.value = ''
   categoryId.value = null
+  parentCategoryId.value = null
   startDate.value = null
   endDate.value = null
   page.value = 1
@@ -264,6 +268,7 @@ const fetchData = async () => {
     const params = { page: page.value, page_size: pageSize.value }
     if (productName.value) params.product_name = productName.value
     if (categoryId.value) params.category_id = categoryId.value
+    else if (parentCategoryId.value) params.parent_category_id = parentCategoryId.value
     if (startDate.value) params.start_date = startDate.value
     if (endDate.value) params.end_date = endDate.value
 

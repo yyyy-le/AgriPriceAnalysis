@@ -143,6 +143,7 @@ async def get_price_list(
     page_size: int = Query(20, ge=1, le=100),
     product_name: Optional[str] = Query(None),
     category_id: Optional[int] = Query(None),
+    parent_category_id: Optional[int] = Query(None),
 ):
     offset = (page - 1) * page_size
     params = {"limit": page_size, "offset": offset}
@@ -154,16 +155,22 @@ async def get_price_list(
     if category_id:
         where_clauses.append("p.category_id = :category_id")
         params["category_id"] = category_id
+    elif parent_category_id:
+        where_clauses.append("c.parent_id = :parent_category_id")
+        params["parent_category_id"] = parent_category_id
 
     where = " AND ".join(where_clauses)
 
     sql = f"""
-        SELECT pr.time, p.name as product_name, c.name as category_name,
+        SELECT pr.time, p.name as product_name,
+               CASE WHEN c.parent_id IS NULL THEN c.name ELSE pc.name END as parent_category_name,
+               CASE WHEN c.parent_id IS NULL THEN NULL ELSE c.name END as category_name,
                pr.spec_info, pr.unit_info, m.name as market_name,
                pr.min_price, pr.max_price, pr.avg_price, p.unit
         FROM price_records pr
         JOIN products p ON pr.product_id = p.id
         JOIN categories c ON p.category_id = c.id
+        LEFT JOIN categories pc ON c.parent_id = pc.id
         LEFT JOIN markets m ON pr.market_id = m.id
         WHERE {where}
         ORDER BY pr.time DESC
@@ -173,6 +180,7 @@ async def get_price_list(
         SELECT COUNT(*)
         FROM price_records pr
         JOIN products p ON pr.product_id = p.id
+        JOIN categories c ON p.category_id = c.id
         WHERE {where}
     """
 
@@ -193,7 +201,7 @@ async def get_categories(
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
     user: Annotated[UserModel, Depends(auth_deps.get_auth_user)],
 ):
-    rows = await session.execute(text("SELECT id, name FROM categories ORDER BY id"))
+    rows = await session.execute(text("SELECT id, name, parent_id FROM categories ORDER BY parent_id NULLS FIRST, id"))
     return [dict(r._mapping) for r in rows]
 
 

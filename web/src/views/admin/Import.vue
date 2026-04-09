@@ -1,28 +1,32 @@
 <template>
   <div>
-    <el-card style="margin-bottom:20px">
-      <template #header><span>📂 CSV 导入说明</span></template>
-      <div style="line-height:2;color:#666;font-size:14px">
-        <p>请按以下格式准备 CSV 文件（UTF-8 编码），第一行为表头：</p>
-        <el-table :data="sampleData" border style="margin:12px 0;width:100%">
-          <el-table-column prop="产品名称" label="产品名称"/>
-          <el-table-column prop="分类名称" label="分类名称"/>
-          <el-table-column prop="市场产地" label="市场/产地"/>
-          <el-table-column prop="均价" label="均价"/>
-          <el-table-column prop="最低价" label="最低价"/>
-          <el-table-column prop="最高价" label="最高价"/>
-          <el-table-column prop="单位" label="单位"/>
-          <el-table-column prop="日期" label="日期"/>
-        </el-table>
-        <p style="color:#e6a23c">⚠️ 日期格式支持 <strong>YYYY-MM-DD</strong> 或 <strong>YYYY/M/D</strong>，如 2026-03-16 或 2026/3/16</p>
-        <el-button type="primary" plain size="small" @click="downloadTemplate" style="margin-top:8px">
-          下载模板文件
-        </el-button>
-      </div>
+    <!-- 说明 -->
+    <el-card style="margin-bottom:16px">
+      <template #header><span>CSV 导入说明</span></template>
+      <p style="color:#666;font-size:14px;margin-bottom:12px">请按以下格式准备 CSV 文件（UTF-8 编码），第一行为表头：</p>
+      <el-table :data="sampleData" border size="small" style="width:100%;margin-bottom:12px">
+        <el-table-column prop="产品名称" label="产品名称" min-width="90"/>
+        <el-table-column prop="一级分类" label="一级分类" min-width="90"/>
+        <el-table-column prop="二级分类" label="二级分类" min-width="90"/>
+        <el-table-column prop="市场产地" label="市场/产地" min-width="90"/>
+        <el-table-column prop="均价" label="均价" min-width="70"/>
+        <el-table-column prop="最低价" label="最低价" min-width="70"/>
+        <el-table-column prop="最高价" label="最高价" min-width="70"/>
+        <el-table-column prop="单位" label="单位" min-width="60"/>
+        <el-table-column prop="日期" label="日期" min-width="110"/>
+      </el-table>
+      <p style="color:#e6a23c;font-size:13px;margin-bottom:10px">
+        ⚠️ 日期格式支持 <b>YYYY-MM-DD</b> 或 <b>YYYY/M/D</b>，如 2026-03-16 或 2026/3/16
+      </p>
+      <p style="color:#909399;font-size:13px;margin-bottom:10px">
+        二级分类为空时，产品将直接归入一级分类。
+      </p>
+      <el-button type="primary" plain size="small" @click="downloadTemplate">下载模板文件</el-button>
     </el-card>
 
-    <el-card>
-      <template #header><span>📤 上传文件</span></template>
+    <!-- 上传 -->
+    <el-card style="margin-bottom:16px">
+      <template #header><span>上传文件</span></template>
       <el-upload
         ref="uploadRef"
         :auto-upload="false"
@@ -32,29 +36,24 @@
         :on-exceed="() => ElMessage.warning('每次只能上传一个文件')"
         drag
       >
-        <div style="padding:20px 0">
-          <div style="font-size:32px">📁</div>
-          <div style="margin-top:8px;color:#666">拖拽 CSV 文件到此处，或点击选择文件</div>
-          <div style="margin-top:4px;font-size:12px;color:#999">仅支持 .csv 格式</div>
+        <div style="padding:30px 0">
+          <div style="font-size:40px">📁</div>
+          <div style="margin-top:10px;color:#606266;font-size:14px">拖拽 CSV 文件到此处，或点击选择文件</div>
+          <div style="margin-top:4px;font-size:12px;color:#909399">仅支持 .csv 格式</div>
         </div>
       </el-upload>
-
-      <div style="margin-top:16px">
-        <el-button
-          type="primary"
-          :loading="uploading"
-          :disabled="!selectedFile"
-          @click="handleUpload"
-        >
+      <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+        <el-button type="primary" :loading="uploading" :disabled="!selectedFile" @click="handleUpload">
           {{ uploading ? '导入中...' : '开始导入' }}
         </el-button>
         <el-button @click="handleReset">重置</el-button>
+        <span v-if="selectedFile" style="font-size:13px;color:#409eff">已选择：{{ selectedFile.name }}</span>
       </div>
     </el-card>
 
-    <!-- 导入结果 -->
-    <el-card v-if="result" style="margin-top:20px">
-      <template #header><span>📋 导入结果</span></template>
+    <!-- 结果 -->
+    <el-card v-if="result">
+      <template #header><span>导入结果</span></template>
       <el-row :gutter="20" style="margin-bottom:16px">
         <el-col :span="8">
           <el-statistic title="成功导入" :value="result.saved">
@@ -72,17 +71,15 @@
           </el-statistic>
         </el-col>
       </el-row>
-
-      <div v-if="result.errors.length > 0">
+      <template v-if="result.errors.length > 0">
         <el-divider/>
-        <p style="color:#f56c6c;margin-bottom:8px;font-size:14px">错误详情：</p>
+        <p style="color:#f56c6c;font-size:14px;margin-bottom:8px">错误详情：</p>
         <el-scrollbar max-height="200px">
-          <div v-for="(err, i) in result.errors" :key="i"
-            style="font-size:13px;color:#f56c6c;padding:2px 0">
+          <div v-for="(err, i) in result.errors" :key="i" style="font-size:13px;color:#f56c6c;padding:2px 0">
             {{ err }}
           </div>
         </el-scrollbar>
-      </div>
+      </template>
     </el-card>
   </div>
 </template>
@@ -98,8 +95,8 @@ const uploading = ref(false)
 const result = ref(null)
 
 const sampleData = [
-  { 产品名称: '大白菜', 分类名称: '蔬菜', 市场产地: '冀鲁', 均价: '1.08', 最低价: '0.95', 最高价: '1.2', 单位: '斤', 日期: '2026-03-16' },
-  { 产品名称: '苹果', 分类名称: '水果', 市场产地: '陕西', 均价: '3.5', 最低价: '3.0', 最高价: '4.0', 单位: '斤', 日期: '2026-03-16' },
+  { 产品名称: '大白菜', 一级分类: '蔬菜', 二级分类: '水菜', 市场产地: '冀鲁', 均价: '1.08', 最低价: '0.95', 最高价: '1.2', 单位: '斤', 日期: '2026-03-16' },
+  { 产品名称: '苹果', 一级分类: '水果', 二级分类: '', 市场产地: '陕西', 均价: '3.5', 最低价: '3.0', 最高价: '4.0', 单位: '斤', 日期: '2026-03-16' },
 ]
 
 const handleFileChange = (file) => {
@@ -116,7 +113,7 @@ const handleUpload = async () => {
     if (res.saved > 0) {
       ElMessage.success(`导入完成，成功 ${res.saved} 条`)
     } else {
-      ElMessage.warning('没有新增数据，可能全部重复')
+      ElMessage.warning('没有新增数据，可能全部重复或存在错误')
     }
   } finally {
     uploading.value = false
@@ -130,9 +127,9 @@ const handleReset = () => {
 }
 
 const downloadTemplate = () => {
-  const header = '产品名称,分类名称,市场/产地,均价,最低价,最高价,单位,日期'
-  const row1 = '大白菜,蔬菜,冀鲁,1.08,0.95,1.2,斤,2026-03-16'
-  const row2 = '苹果,水果,陕西,3.5,3.0,4.0,斤,2026-03-16'
+  const header = '产品名称,一级分类,二级分类,市场/产地,均价,最低价,最高价,单位,日期'
+  const row1 = '大白菜,蔬菜,水菜,冀鲁,1.08,0.95,1.2,斤,2026-03-16'
+  const row2 = '苹果,水果,,陕西,3.5,3.0,4.0,斤,2026-03-16'
   const csv = [header, row1, row2].join('\n')
   const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)

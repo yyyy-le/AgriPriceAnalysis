@@ -45,6 +45,8 @@ class XinfadiCrawler(BaseCrawler):
                 "prod_name": item.get("prodName", "").strip(),
                 "prod_cat": item.get("prodCat", "").strip(),
                 "prod_catid": item.get("prodCatid"),
+                "prod_pcat": item.get("prodPcat", "").strip(),
+                "prod_pcatid": item.get("prodPcatid"),
                 "low_price": float(item.get("lowPrice") or 0),
                 "high_price": float(item.get("highPrice") or 0),
                 "avg_price": float(item.get("avgPrice") or 0),
@@ -61,10 +63,18 @@ class XinfadiCrawler(BaseCrawler):
 
         for item in data:
             try:
-                # 1. 获取或创建分类
-                category_id = await self._get_or_create_category(item["prod_cat"], item["prod_catid"])
+                # 1. 获取或创建一级分类（父分类）
+                await self._get_or_create_category(item["prod_cat"], item["prod_catid"], parent_id=None)
 
-                # 2. 获取或创建产品
+                # 2. 获取或创建二级分类（子分类），关联父分类
+                if item["prod_pcatid"]:
+                    category_id = await self._get_or_create_category(
+                        item["prod_pcat"], item["prod_pcatid"], parent_id=item["prod_catid"]
+                    )
+                else:
+                    category_id = item["prod_catid"]
+
+                # 3. 获取或创建产品（挂在二级分类下）
                 product_id = await self._get_or_create_product(
                     item["prod_name"], category_id, item["unit_info"], item["spec_info"]
                 )
@@ -104,7 +114,7 @@ class XinfadiCrawler(BaseCrawler):
         await self.session.commit()
         return saved, skipped
 
-    async def _get_or_create_category(self, name: str, catid: int) -> int:
+    async def _get_or_create_category(self, name: str, catid: int, parent_id=None) -> int:
         result = await self.session.execute(
             text("SELECT id FROM categories WHERE id = :id"), {"id": catid}
         )
@@ -113,8 +123,8 @@ class XinfadiCrawler(BaseCrawler):
             return row[0]
 
         await self.session.execute(
-            text("INSERT INTO categories (id, name) VALUES (:id, :name) ON CONFLICT DO NOTHING"),
-            {"id": catid, "name": name}
+            text("INSERT INTO categories (id, name, parent_id) VALUES (:id, :name, :parent_id) ON CONFLICT DO NOTHING"),
+            {"id": catid, "name": name, "parent_id": parent_id}
         )
         return catid
 

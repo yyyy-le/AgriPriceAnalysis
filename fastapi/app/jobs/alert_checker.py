@@ -67,11 +67,11 @@ async def check_price_alerts():
                     triggered = True
 
                 if triggered:
-                    # 检查是否在最近1小时内已经触发过相同预警（避免重复通知）
+                    # 检查今天是否已经触发过相同预警（每天只触发一次）
                     check_recent_sql = """
                         SELECT id FROM alert_logs
                         WHERE alert_id = :alert_id
-                          AND triggered_at > NOW() - INTERVAL '1 hour'
+                          AND DATE(triggered_at) = CURRENT_DATE
                         LIMIT 1
                     """
                     recent = await session.execute(
@@ -80,7 +80,7 @@ async def check_price_alerts():
                     )
 
                     if recent.fetchone():
-                        logger.debug(f"[价格预警] 预警 {alert['id']} 最近1小时内已触发，跳过")
+                        logger.debug(f"[价格预警] 预警 {alert['id']} 今日已触发，跳过")
                         continue
 
                     # 记录预警日志

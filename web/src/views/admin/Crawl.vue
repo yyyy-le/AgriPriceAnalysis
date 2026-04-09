@@ -66,7 +66,7 @@
     <el-card style="margin-top:20px">
       <template #header>
         <span>📋 运行日志</span>
-        <el-button size="small" style="float:right" @click="logs = []">清空</el-button>
+        <el-button size="small" style="float:right" @click="clearLogs">清空</el-button>
       </template>
       <div
         ref="logBox"
@@ -146,18 +146,25 @@ const clearSavedTaskId = () => {
 }
 
 const saveLogs = () => {
-  // 最多保存 200 条日志，避免超出 sessionStorage 容量
+  if (sessionStorage.getItem('crawl_logs_cleared') === '1') return
   const slice = logs.value.slice(-200)
   sessionStorage.setItem('crawl_logs', JSON.stringify(slice))
 }
 
 const restoreLogs = () => {
+  if (sessionStorage.getItem('crawl_logs_cleared') === '1') return
   const saved = sessionStorage.getItem('crawl_logs')
   if (saved) {
     try {
       logs.value = JSON.parse(saved)
     } catch {}
   }
+}
+
+const clearLogs = () => {
+  logs.value = []
+  sessionStorage.removeItem('crawl_logs')
+  sessionStorage.setItem('crawl_logs_cleared', '1')
 }
 
 const addLog = (text, color = '#fff') => {
@@ -245,10 +252,15 @@ const cancelCrawl = async () => {
     })
     await request.post(`/api/crawl/cancel/${currentTaskId}`)
     clearInterval(pollTimer)
+    // 取消后再拉一次最终状态，确保 saved/skipped 是最新值
+    try {
+      const final = await request.get(`/api/crawl/status/${currentTaskId}`)
+      task.value = { ...task.value, ...final }
+    } catch {}
     clearSavedTaskId()
     task.value.status = 'cancelled'
     task.value.paused = false
-    addLog('⛔ 用户取消了抓取任务', '#909399')
+    addLog(`⛔ 用户取消了抓取任务，本次共存入 ${task.value.saved} 条，跳过 ${task.value.skipped} 条`, '#909399')
     ElMessage.info('已取消')
   } catch {
     // 用户点了"继续抓取"，不做任何处理

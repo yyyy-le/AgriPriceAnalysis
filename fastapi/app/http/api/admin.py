@@ -192,6 +192,7 @@ async def get_products_aggregated(
     page_size: int = Query(20, ge=1, le=100),
     product_name: Optional[str] = Query(None),
     category_id: Optional[int] = Query(None),
+    parent_category_id: Optional[int] = Query(None),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
 ):
@@ -205,6 +206,9 @@ async def get_products_aggregated(
     if category_id:
         where_clauses.append("p.category_id = :category_id")
         params["category_id"] = category_id
+    elif parent_category_id:
+        where_clauses.append("c.parent_id = :parent_category_id")
+        params["parent_category_id"] = parent_category_id
     # 日期条件：直接拼字符串到 SQL，避免 asyncpg 参数解析问题
     lateral_date_clauses = ["product_id = p.id"]
     if start_date:
@@ -219,7 +223,8 @@ async def get_products_aggregated(
         SELECT
             p.id as product_id,
             p.name as product_name,
-            c.name as category_name,
+            CASE WHEN c.parent_id IS NULL THEN c.name ELSE pc.name END as parent_category_name,
+            CASE WHEN c.parent_id IS NULL THEN NULL ELSE c.name END as category_name,
             p.unit,
             stats.record_count,
             stats.min_price,
@@ -229,6 +234,7 @@ async def get_products_aggregated(
             stats.source
         FROM products p
         JOIN categories c ON p.category_id = c.id
+        LEFT JOIN categories pc ON c.parent_id = pc.id
         JOIN LATERAL (
             SELECT
                 COUNT(*) as record_count,
@@ -428,7 +434,8 @@ async def import_csv(
     for i, row in enumerate(reader, start=2):
         try:
             product_name = row.get('产品名称', '').strip()
-            category_name = row.get('分类名称', '').strip()
+            parent_cat_name = row.get('一级分类', '').strip()
+            category_name = row.get('二级分类', '').strip()
             market_name = row.get('市场/产地', '').strip() or '未知'
             avg_price = float(row.get('均价', 0))
             min_price = float(row.get('最低价', 0))
@@ -449,18 +456,44 @@ async def import_csv(
                 continue
             record_time = record_time.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
 
-            cat_row = await session.execute(
-                text("SELECT id FROM categories WHERE name = :name"), {"name": category_name}
-            )
-            cat = cat_row.fetchone()
-            if cat:
-                category_id = cat[0]
-            else:
-                cat_result = await session.execute(
-                    text("INSERT INTO categories (name) VALUES (:name) RETURNING id"),
-                    {"name": category_name}
+            # 处理一级分类
+            parent_cat_id = None
+            if parent_cat_name:
+                pc_row = await session.execute(
+                    text("SELECT id FROM categories WHERE name = :name AND parent_id IS NULL"),
+                    {"name": parent_cat_name}
                 )
-                category_id = cat_result.fetchone()[0]
+                pc = pc_row.fetchone()
+                if pc:
+                    parent_cat_id = pc[0]
+                else:
+                    pc_result = await session.execute(
+                        text("INSERT INTO categories (name) VALUES (:name) RETURNING id"),
+                        {"name": parent_cat_name}
+                    )
+                    parent_cat_id = pc_result.fetchone()[0]
+
+            # 处理二级分类（挂在一级下），若无二级则用一级作为产品分类
+            if category_name:
+                c_row = await session.execute(
+                    text("SELECT id FROM categories WHERE name = :name AND parent_id IS NOT DISTINCT FROM :parent_id"),
+                    {"name": category_name, "parent_id": parent_cat_id}
+                )
+                c = c_row.fetchone()
+                if c:
+                    category_id = c[0]
+                else:
+                    c_result = await session.execute(
+                        text("INSERT INTO categories (name, parent_id) VALUES (:name, :parent_id) RETURNING id"),
+                        {"name": category_name, "parent_id": parent_cat_id}
+                    )
+                    category_id = c_result.fetchone()[0]
+            elif parent_cat_id:
+                category_id = parent_cat_id
+            else:
+                errors.append(f'第{i}行：一级分类和二级分类均为空')
+                skipped += 1
+                continue
 
             prod_row = await session.execute(
                 text("SELECT id FROM products WHERE name = :name AND category_id = :cat_id"),
@@ -489,7 +522,7 @@ async def import_csv(
                 )
                 market_id = mkt_result.fetchone()[0]
 
-            result = await session.execute(text("""
+            ins = await session.execute(text("""
                 INSERT INTO price_records (time, product_id, market_id, price, min_price, max_price, avg_price, source)
                 VALUES (:time, :product_id, :market_id, :avg_price, :min_price, :max_price, :avg_price, 'csv')
                 ON CONFLICT DO NOTHING
@@ -499,7 +532,7 @@ async def import_csv(
                 "avg_price": avg_price, "min_price": min_price, "max_price": max_price
             })
 
-            if result.fetchone():
+            if ins.fetchone():
                 saved += 1
             else:
                 skipped += 1
