@@ -85,8 +85,8 @@ async def create_user_by_admin(
     hashed = get_password_hash(password)
     state = 'enabled' if enabled else 'disabled'
     await session.execute(text("""
-        INSERT INTO users (id, username, password, cellphone, state, avatar, is_admin)
-        VALUES (gen_random_uuid(), :username, :password, :cellphone, :state, '', :is_admin)
+        INSERT INTO users (id, username, password, cellphone, state, is_admin)
+        VALUES (gen_random_uuid(), :username, :password, :cellphone, :state, :is_admin)
     """), {
         "username": username, "password": hashed,
         "cellphone": cellphone, "state": state, "is_admin": is_admin

@@ -20,7 +20,6 @@ class UserModel(TableModel):
     state: Mapped[USER_STATE_TYPE] = mapped_column(
         USER_STATE_PG_TYPE, default='enabled', server_default='enabled'
     )  # 用户状态
-    avatar: Mapped[str] = mapped_column(sa.String, default='')  # 头像路径
     is_admin: Mapped[bool] = mapped_column(sa.Boolean, default=False)  # 是否管理员
 
     def is_enabled(self) -> bool:
