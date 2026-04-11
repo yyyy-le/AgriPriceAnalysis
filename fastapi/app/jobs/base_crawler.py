@@ -31,7 +31,7 @@ class BaseCrawler(ABC):
             # total = first.get('count', 0)
             # total_pages = (total + limit - 1) // limit
             # logger.info(f"[{self.source_name}] 共 {total} 条数据，{total_pages} 页")
-            total_pages = 1200  # 手动设置总页数，按需调整
+            total_pages = 2600  # 手动设置总页数，按需调整
             logger.info(f"[{self.source_name}] 从第 {start_page} 页开始，共 {total_pages} 页")
 
             for page in range(start_page, total_pages + 1):
@@ -50,7 +50,7 @@ class BaseCrawler(ABC):
                     await self.on_progress(page, total_pages, total_saved, total_skipped)
 
                 if page < total_pages:
-                    await asyncio.sleep(random.uniform(1, 3))
+                    await asyncio.sleep(random.uniform(1, 1.5))
 
                 # TODO: 重复检测暂时关闭，待完善检测逻辑后重新启用
                 # if saved == 0 and skipped > 0:

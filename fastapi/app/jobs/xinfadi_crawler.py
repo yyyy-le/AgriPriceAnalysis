@@ -1,4 +1,5 @@
 import asyncio
+import socket
 import aiohttp
 from datetime import datetime
 from sqlalchemy import text
@@ -19,6 +20,17 @@ class XinfadiCrawler(BaseCrawler):
 
     def __init__(self, session: AsyncSession):
         self.session = session
+        connector = aiohttp.TCPConnector(family=socket.AF_INET)
+        self._http = aiohttp.ClientSession(
+            connector=connector,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Referer": "http://www.xinfadi.com.cn/priceDetail.html"
+            }
+        )
+
+    async def close(self):
+        await self._http.close()
 
     async def fetch(self, page: int = 1, limit: int = 100) -> dict:
         params = {
@@ -29,13 +41,8 @@ class XinfadiCrawler(BaseCrawler):
             "prodCatid": "",
             "prodName": ""
         }
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Referer": "http://www.xinfadi.com.cn/priceDetail.html"
-        }
-        async with aiohttp.ClientSession() as client:
-            async with client.get(XINFADI_URL, params=params, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                return await resp.json(content_type=None)
+        async with self._http.get(XINFADI_URL, params=params, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+            return await resp.json(content_type=None)
 
     async def parse(self, raw_data: dict) -> list[dict]:
         items = raw_data.get("list", [])

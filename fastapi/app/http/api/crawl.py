@@ -62,7 +62,9 @@ async def run_crawl_task(task_id: str, session: AsyncSession, start_page: int = 
         crawl_status[task_id]["status"] = "failed"
         crawl_status[task_id]["result"] = str(e)
     finally:
-        crawl_crawlers.pop(task_id, None)
+        crawler = crawl_crawlers.pop(task_id, None)
+        if crawler:
+            await crawler.close()
 
 
 @router.post('/xinfadi', name='触发新发地爬虫')
