@@ -2,7 +2,7 @@
   <div style="width:100%">
     <el-card style="margin-bottom:20px">
       <el-row :gutter="12">
-        <el-col :span="8">
+        <el-col :span="5">
           <el-input v-model="filters.product_name" placeholder="搜索产品名称" clearable @change="fetchData"/>
         </el-col>
         <el-col :span="5">
@@ -15,9 +15,21 @@
             <el-option v-for="c in childCategories" :key="c.id" :label="c.name" :value="c.id"/>
           </el-select>
         </el-col>
-        <el-col :span="4">
+        <el-col :span="7" style="display:flex;align-items:center;gap:8px">
+          <el-date-picker
+            v-model="dateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            value-format="YYYY-MM-DD"
+            style="flex:1"
+            @change="fetchData"
+            clearable
+            :disabled-date="(d) => !availableDates.has(d.toISOString().slice(0, 10))"
+          />
           <el-button type="primary" @click="fetchData">查询</el-button>
-          <el-button @click="resetFilters" style="margin-left:8px">重置</el-button>
+          <el-button @click="resetFilters">重置</el-button>
         </el-col>
       </el-row>
     </el-card>
@@ -66,12 +78,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { getPriceList, getCategories } from '../../api/price'
+import { getPriceList, getCategories, getAvailableDates } from '../../api/price'
 
 const loading = ref(false)
 const list = ref([])
 const total = ref(0)
 const allCategories = ref([])
+const dateRange = ref(null)
+const availableDates = ref(new Set())
 const filters = ref({ page: 1, page_size: 20, product_name: '', parent_category_id: null, category_id: null })
 
 const parentCategories = computed(() => allCategories.value.filter(c => !c.parent_id))
@@ -88,6 +102,7 @@ const onParentCatChange = () => {
 
 const resetFilters = () => {
   filters.value = { page: 1, page_size: 20, product_name: '', parent_category_id: null, category_id: null }
+  dateRange.value = null
   fetchData()
 }
 
@@ -100,6 +115,8 @@ const fetchData = async () => {
     if (!params.product_name) delete params.product_name
     if (!params.category_id) delete params.category_id
     if (!params.parent_category_id) delete params.parent_category_id
+    if (dateRange.value?.[0]) params.date_start = dateRange.value[0]
+    if (dateRange.value?.[1]) params.date_end = dateRange.value[1]
     const res = await getPriceList(params)
     list.value = res.list
     total.value = res.total
@@ -109,7 +126,9 @@ const fetchData = async () => {
 }
 
 onMounted(async () => {
-  allCategories.value = await getCategories()
+  const [cats, dates] = await Promise.all([getCategories(), getAvailableDates()])
+  allCategories.value = cats
+  availableDates.value = new Set(dates)
   await fetchData()
 })
 </script>

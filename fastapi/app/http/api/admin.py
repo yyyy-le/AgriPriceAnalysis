@@ -1,7 +1,7 @@
 from typing import Annotated, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
-from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, Request, UploadFile
 
 from app.http.deps import database_deps, auth_deps
 from app.models.user import UserModel
@@ -13,6 +13,15 @@ def require_admin(user: UserModel = Depends(auth_deps.get_auth_user)):
     if not user.is_admin:
         raise HTTPException(status_code=403, detail='无权限')
     return user
+
+
+async def write_log(session: AsyncSession, admin: UserModel, action: str, target: str = '', detail: str = '', request: Request = None):
+    ip = request.client.host if request else ''
+    await session.execute(text("""
+        INSERT INTO admin_logs (admin_id, admin_name, action, target, detail, ip)
+        VALUES (:admin_id, :admin_name, :action, :target, :detail, :ip)
+    """), {"admin_id": str(admin.id), "admin_name": admin.username,
+           "action": action, "target": target, "detail": detail, "ip": ip})
 
 
 # ===== 用户管理 =====
@@ -58,6 +67,7 @@ async def get_users(
 
 @router.post('/users', name='新增用户')
 async def create_user_by_admin(
+    request: Request,
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
     admin: Annotated[UserModel, Depends(require_admin)],
     username: str = Body(...),
@@ -91,6 +101,7 @@ async def create_user_by_admin(
         "username": username, "password": hashed,
         "cellphone": cellphone, "state": state, "is_admin": is_admin
     })
+    await write_log(session, admin, 'create_user', f'用户 {username}', f'手机号:{cellphone} 管理员:{is_admin}', request)
     await session.commit()
     return {"success": True}
 
@@ -98,6 +109,7 @@ async def create_user_by_admin(
 @router.put('/users/{user_id}', name='编辑用户')
 async def update_user_by_admin(
     user_id: str,
+    request: Request,
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
     admin: Annotated[UserModel, Depends(require_admin)],
     cellphone: str = Body(...),
@@ -134,6 +146,7 @@ async def update_user_by_admin(
             "is_admin": is_admin, "state": state, "id": user_id
         })
 
+    await write_log(session, admin, 'update_user', f'用户ID {user_id}', f'手机号:{cellphone} 状态:{state} 管理员:{is_admin}', request)
     await session.commit()
     return {"success": True}
 
@@ -141,6 +154,7 @@ async def update_user_by_admin(
 @router.patch('/users/{user_id}/state', name='修改用户状态')
 async def update_user_state(
     user_id: str,
+    request: Request,
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
     admin: Annotated[UserModel, Depends(require_admin)],
     state: str = Query(..., pattern='^(enabled|disabled)$'),
@@ -149,6 +163,7 @@ async def update_user_state(
         text("UPDATE users SET state = :state WHERE id = :id"),
         {"state": state, "id": user_id}
     )
+    await write_log(session, admin, 'update_user_state', f'用户ID {user_id}', f'状态改为:{state}', request)
     await session.commit()
     return {"success": True}
 
@@ -156,6 +171,7 @@ async def update_user_state(
 @router.patch('/users/{user_id}/admin', name='设置管理员')
 async def update_user_admin(
     user_id: str,
+    request: Request,
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
     admin: Annotated[UserModel, Depends(require_admin)],
     is_admin: bool = Query(...),
@@ -164,6 +180,7 @@ async def update_user_admin(
         text("UPDATE users SET is_admin = :is_admin WHERE id = :id"),
         {"is_admin": is_admin, "id": user_id}
     )
+    await write_log(session, admin, 'update_user_admin', f'用户ID {user_id}', f'管理员权限:{is_admin}', request)
     await session.commit()
     return {"success": True}
 
@@ -171,13 +188,17 @@ async def update_user_admin(
 @router.delete('/users/{user_id}', name='删除用户')
 async def delete_user(
     user_id: str,
+    request: Request,
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
     admin: Annotated[UserModel, Depends(require_admin)],
 ):
+    row = await session.execute(text("SELECT username FROM users WHERE id = :id"), {"id": user_id})
+    username = (row.fetchone() or [user_id])[0]
     await session.execute(
         text("UPDATE users SET deleted_at = NOW() WHERE id = :id"),
         {"id": user_id}
     )
+    await write_log(session, admin, 'delete_user', f'用户 {username}', '', request)
     await session.commit()
     return {"success": True}
 
@@ -375,6 +396,7 @@ async def get_price_records(
 
 @router.delete('/data/records', name='删除价格记录')
 async def delete_price_record(
+    request: Request,
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
     admin: Annotated[UserModel, Depends(require_admin)],
     product_id: int = Query(...),
@@ -386,12 +408,14 @@ async def delete_price_record(
         text("DELETE FROM price_records WHERE product_id = :product_id AND time = :time"),
         {"product_id": product_id, "time": parsed_time}
     )
+    await write_log(session, admin, 'delete_price_record', f'产品ID {product_id}', f'时间:{time}', request)
     await session.commit()
     return {"success": True}
 
 
 @router.put('/data/records', name='编辑价格记录')
 async def update_price_record(
+    request: Request,
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
     admin: Annotated[UserModel, Depends(require_admin)],
     product_id: int = Body(...),
@@ -410,12 +434,14 @@ async def update_price_record(
         "avg_price": avg_price, "min_price": min_price,
         "max_price": max_price, "product_id": product_id, "time": parsed_time
     })
+    await write_log(session, admin, 'update_price_record', f'产品ID {product_id}', f'时间:{time} 均价:{avg_price}', request)
     await session.commit()
     return {"success": True}
 
 
 @router.post('/data/import-csv', name='CSV导入价格数据')
 async def import_csv(
+    request: Request,
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
     admin: Annotated[UserModel, Depends(require_admin)],
     file: UploadFile = File(...),
@@ -541,6 +567,7 @@ async def import_csv(
             errors.append(f'第{i}行处理失败：{str(e)}')
             skipped += 1
 
+    await write_log(session, admin, 'import_csv', file.filename, f'导入:{saved} 跳过:{skipped}', request)
     await session.commit()
     return {"saved": saved, "skipped": skipped, "errors": errors}
 
@@ -551,12 +578,36 @@ async def import_csv(
 async def get_logs(
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
     admin: Annotated[UserModel, Depends(require_admin)],
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    action: Optional[str] = Query(None),
+    admin_name: Optional[str] = Query(None),
 ):
-    sql = """
-        SELECT source, MAX(time) as last_run, COUNT(*) as total_records
-        FROM price_records
-        GROUP BY source
-        ORDER BY last_run DESC
-    """
-    rows = await session.execute(text(sql))
-    return [dict(r._mapping) for r in rows]
+    offset = (page - 1) * page_size
+    params = {"limit": page_size, "offset": offset}
+    where_clauses = ["1=1"]
+    if action:
+        where_clauses.append("action = :action")
+        params["action"] = action
+    if admin_name:
+        where_clauses.append("admin_name ILIKE :admin_name")
+        params["admin_name"] = f"%{admin_name}%"
+    where = " AND ".join(where_clauses)
+    count_params = {k: v for k, v in params.items() if k not in ('limit', 'offset')}
+
+    rows = await session.execute(text(f"""
+        SELECT id, admin_name, action, target, detail, ip, created_at
+        FROM admin_logs WHERE {where}
+        ORDER BY created_at DESC
+        LIMIT :limit OFFSET :offset
+    """), params)
+    total = await session.execute(text(f"SELECT COUNT(*) FROM admin_logs WHERE {where}"), count_params)
+    actions = await session.execute(text("SELECT DISTINCT action FROM admin_logs ORDER BY action"))
+
+    return {
+        "total": total.scalar(),
+        "page": page,
+        "page_size": page_size,
+        "list": [dict(r._mapping) for r in rows],
+        "actions": [r[0] for r in actions],
+    }

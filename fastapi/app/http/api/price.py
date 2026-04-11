@@ -1,4 +1,5 @@
 from typing import Annotated, Optional
+from datetime import date
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
@@ -99,6 +100,35 @@ async def get_top_cheapest(
     return [dict(r._mapping) for r in rows]
 
 
+@router.get('/imported-fruits', name='进口水果价格排行')
+async def get_imported_fruits(
+    session: Annotated[AsyncSession, Depends(database_deps.get_db)],
+    user: Annotated[UserModel, Depends(auth_deps.get_auth_user)],
+):
+    sql = """
+        SELECT p.name as product_name,
+               ROUND(AVG(pr.avg_price)::numeric, 2) as avg_price,
+               ROUND(MIN(pr.min_price)::numeric, 2) as min_price,
+               ROUND(MAX(pr.max_price)::numeric, 2) as max_price,
+               p.unit
+        FROM price_records pr
+        JOIN products p ON pr.product_id = p.id
+        JOIN categories c ON p.category_id = c.id
+        WHERE c.name = '进口果'
+          AND DATE(pr.time) = (
+              SELECT DATE(MAX(pr2.time))
+              FROM price_records pr2
+              JOIN products p2 ON pr2.product_id = p2.id
+              JOIN categories c2 ON p2.category_id = c2.id
+              WHERE c2.name = '进口果'
+          )
+        GROUP BY p.name, p.unit
+        ORDER BY avg_price DESC
+    """
+    rows = await session.execute(text(sql))
+    return [dict(r._mapping) for r in rows]
+
+
 @router.get('/price-volatility', name='价格波动最大Top8')
 async def get_price_volatility(
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
@@ -135,6 +165,24 @@ async def get_market_stats(
     return [dict(r._mapping) for r in rows]
 
 
+@router.get('/date-range', name='数据日期范围')
+async def get_date_range(
+    session: Annotated[AsyncSession, Depends(database_deps.get_db)],
+    user: Annotated[UserModel, Depends(auth_deps.get_auth_user)],
+):
+    row = (await session.execute(text("SELECT MIN(DATE(time)) as min_date, MAX(DATE(time)) as max_date FROM price_records"))).mappings().one()
+    return {"min_date": str(row["min_date"]), "max_date": str(row["max_date"])}
+
+
+@router.get('/available-dates', name='有数据的日期列表')
+async def get_available_dates(
+    session: Annotated[AsyncSession, Depends(database_deps.get_db)],
+    user: Annotated[UserModel, Depends(auth_deps.get_auth_user)],
+):
+    rows = await session.execute(text("SELECT DISTINCT DATE(time) as d FROM price_records ORDER BY d"))
+    return [str(r["d"]) for r in rows.mappings()]
+
+
 @router.get('/list', name='价格列表')
 async def get_price_list(
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
@@ -144,6 +192,8 @@ async def get_price_list(
     product_name: Optional[str] = Query(None),
     category_id: Optional[int] = Query(None),
     parent_category_id: Optional[int] = Query(None),
+    date_start: Optional[date] = Query(None),
+    date_end: Optional[date] = Query(None),
 ):
     offset = (page - 1) * page_size
     params = {"limit": page_size, "offset": offset}
@@ -158,6 +208,12 @@ async def get_price_list(
     elif parent_category_id:
         where_clauses.append("c.parent_id = :parent_category_id")
         params["parent_category_id"] = parent_category_id
+    if date_start:
+        where_clauses.append("DATE(pr.time) >= :date_start")
+        params["date_start"] = date_start
+    if date_end:
+        where_clauses.append("DATE(pr.time) <= :date_end")
+        params["date_end"] = date_end
 
     where = " AND ".join(where_clauses)
 
@@ -314,6 +370,46 @@ async def get_wordcloud(
     """
     rows = await session.execute(text(sql))
     return [{"name": r.product_name, "value": int(r.count)} for r in rows]
+
+
+@router.get('/sunburst', name='品种旭日图数据')
+async def get_sunburst(
+    session: Annotated[AsyncSession, Depends(database_deps.get_db)],
+    user: Annotated[UserModel, Depends(auth_deps.get_auth_user)],
+):
+    sql = """
+        WITH ranked AS (
+            SELECT pc.name as parent_cat, c.name as child_cat,
+                   p.name as product_name, COUNT(pr.product_id) as record_count,
+                   ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY COUNT(pr.product_id) DESC) as rn
+            FROM products p
+            JOIN categories c ON p.category_id = c.id
+            JOIN categories pc ON c.parent_id = pc.id
+            LEFT JOIN price_records pr ON pr.product_id = p.id
+            GROUP BY pc.name, c.name, c.id, p.name
+        )
+        SELECT parent_cat, child_cat, product_name, record_count
+        FROM ranked WHERE rn <= 15
+        ORDER BY parent_cat, child_cat, record_count DESC
+    """
+    rows = await session.execute(text(sql))
+    records = [dict(r._mapping) for r in rows]
+
+    tree = {}
+    for r in records:
+        pc, cc, pn, cnt = r['parent_cat'], r['child_cat'], r['product_name'], int(r['record_count'] or 1)
+        if pc not in tree:
+            tree[pc] = {}
+        if cc not in tree[pc]:
+            tree[pc][cc] = []
+        tree[pc][cc].append({"name": pn, "value": cnt})
+
+    result = []
+    for pc, children in tree.items():
+        child_nodes = [{"name": cc, "children": prods} for cc, prods in children.items()]
+        result.append({"name": pc, "children": child_nodes})
+
+    return result
 
 
 @router.get('/volatility-trend', name='波动Top8产品30天走势')

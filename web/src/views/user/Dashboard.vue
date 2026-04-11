@@ -61,13 +61,25 @@
     </el-row>
 
     <!-- 第四行：波动折线图（全宽） -->
-    <el-row :gutter="16">
+    <el-row :gutter="16" style="margin-bottom:16px">
       <el-col :span="24">
         <el-card shadow="never" style="border:1px solid #e8eaf0">
           <template #header>
             <span style="font-size:14px;font-weight:500;color:#1e293b">📈 近30天价格波动最大 Top8 走势</span>
           </template>
           <div ref="trendRef" style="height:320px"/>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 第五行：进口水果价格排行 -->
+    <el-row :gutter="16" style="margin-bottom:16px">
+      <el-col :span="24">
+        <el-card shadow="never" style="border:1px solid #e8eaf0">
+          <template #header>
+            <span style="font-size:14px;font-weight:500;color:#1e293b">🍇 进口水果价格排行（元/kg）</span>
+          </template>
+          <div ref="importedFruitsRef" style="height:520px"/>
         </el-card>
       </el-col>
     </el-row>
@@ -81,7 +93,8 @@ import 'echarts-wordcloud'
 import {
   getSummary,
   getTopExpensive, getTopCheapest,
-  getWordCloud, getVolatilityTrend, getProvinceStats
+  getWordCloud, getVolatilityTrend, getProvinceStats,
+  getImportedFruits
 } from '../../api/price'
 
 const wordcloudRef = ref(null)
@@ -89,6 +102,7 @@ const mapRef = ref(null)
 const expensiveRef = ref(null)
 const cheapestRef = ref(null)
 const trendRef = ref(null)
+const importedFruitsRef = ref(null)
 
 const stats = ref([
   { label: '价格记录总数', value: '-', icon: '📋', color: '#6366f1', bg: '#ede9fe' },
@@ -252,14 +266,45 @@ const renderTrend = (trendData) => {
   })
 }
 
+const renderImportedFruits = (data) => {
+  const c = initChart(importedFruitsRef.value)
+  const names = data.map(d => d.product_name)
+  const avgPrices = data.map(d => Number(d.avg_price))
+  const minPrices = data.map(d => Number(d.min_price))
+  const maxPrices = data.map(d => Number(d.max_price))
+  c.setOption({
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (params) => {
+        const name = params[0].axisValue
+        const avg = params.find(p => p.seriesName === '均价')?.value ?? '-'
+        const min = params.find(p => p.seriesName === '最低价')?.value ?? '-'
+        const max = params.find(p => p.seriesName === '最高价')?.value ?? '-'
+        return `${name}<br/>均价：${avg} 元/kg<br/>最低：${min}<br/>最高：${max}`
+      }
+    },
+    legend: { data: ['最低价', '均价', '最高价'], top: 0, textStyle: { fontSize: 11 } },
+    grid: { left: 80, right: 20, top: 30, bottom: 20 },
+    xAxis: { type: 'value', name: '元/kg', nameTextStyle: { fontSize: 11 }, axisLabel: { fontSize: 10 } },
+    yAxis: { type: 'category', data: names, axisLabel: { fontSize: 11 } },
+    series: [
+      { name: '最低价', type: 'bar', data: minPrices, itemStyle: { color: '#10b981' }, barMaxWidth: 12 },
+      { name: '均价',   type: 'bar', data: avgPrices, itemStyle: { color: '#6366f1' }, barMaxWidth: 12 },
+      { name: '最高价', type: 'bar', data: maxPrices, itemStyle: { color: '#f56c6c' }, barMaxWidth: 12 },
+    ]
+  })
+}
+
 onMounted(async () => {
-  const [summary, expensive, cheapest, wordcloud, trend, province] = await Promise.all([
+  const [summary, expensive, cheapest, wordcloud, trend, province, importedFruits] = await Promise.all([
     getSummary(),
     getTopExpensive(),
     getTopCheapest(),
     getWordCloud(),
     getVolatilityTrend(),
     getProvinceStats(),
+    getImportedFruits(),
   ])
 
   stats.value[0].value = summary.total_records?.toLocaleString() ?? '-'
@@ -274,6 +319,7 @@ onMounted(async () => {
   renderBar(expensiveRef.value, expensive.reverse(), 'product_name', 'avg_price', '#f56c6c')
   renderBar(cheapestRef.value, cheapest.reverse(), 'product_name', 'avg_price', '#10b981')
   renderTrend(trend)
+  renderImportedFruits(importedFruits.reverse())
 
   resizeHandler = () => charts.forEach(c => c.resize())
   window.addEventListener('resize', resizeHandler)

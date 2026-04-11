@@ -6,6 +6,12 @@ export const getSummary = () =>
 export const getPriceList = (params) =>
   request.get('/api/prices/list', { params })
 
+export const getPriceDateRange = () =>
+  request.get('/api/prices/date-range')
+
+export const getAvailableDates = () =>
+  request.get('/api/prices/available-dates')
+
 export const getCategories = () =>
   request.get('/api/prices/categories')
 
@@ -26,6 +32,12 @@ export const getTopExpensive = () =>
 
 export const getTopCheapest = () =>
   request.get('/api/prices/top-cheapest')
+
+export const getImportedFruits = () =>
+  request.get('/api/prices/imported-fruits')
+
+export const getSunburst = () =>
+  request.get('/api/prices/sunburst')
 
 export const getPriceVolatility = () =>
   request.get('/api/prices/price-volatility')

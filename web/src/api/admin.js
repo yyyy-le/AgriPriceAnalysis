@@ -38,5 +38,5 @@ export const importCsv = (file) => {
 }
 
 // 系统日志
-export const getLogs = () =>
-  request.get('/api/admin/logs')
+export const getLogs = (params) =>
+  request.get('/api/admin/logs', { params })
