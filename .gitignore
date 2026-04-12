@@ -53,3 +53,10 @@ logs/
 
 # Docker volumes
 docker/volumes/
+/volumes
+
+# Frontend
+node_modules
+dist
+dist-ssr
+*.local

@@ -30,8 +30,16 @@ request.interceptors.response.use(
 
     if (typeof data === 'string') {
       msg = data
+    } else if (data?.message) {
+      // 后端直接返回 { code, message } 格式
+      msg = data.message
     } else if (data?.detail) {
-      msg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)
+      // FastAPI HTTPException 格式 { detail: { code, message } }
+      if (typeof data.detail === 'string') {
+        msg = data.detail
+      } else if (data.detail?.message) {
+        msg = data.detail.message
+      }
     }
 
     ElMessage.error(msg)

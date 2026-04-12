@@ -34,14 +34,14 @@ class PasswordGrant:
             & UserModel.exist_filter(),
         )
         if not user:
-            raise UserNotFoundError()
+            raise UserNotFoundError(message='没有此用户')
 
         # 用户密码校验
         if not (user.password and password_helper.verify_password(self.request_data.password, user.password)):
-            raise InvalidPasswordError()
+            raise InvalidPasswordError(message='用户名或密码错误')
 
         # 用户状态校验
         if not user.is_enabled():
-            raise InvalidUserError()
+            raise InvalidUserError(message='该账号已被禁用')
 
         return create_token_response_from_user(user)
