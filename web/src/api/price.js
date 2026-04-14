@@ -18,9 +18,6 @@ export const getCategories = () =>
 export const getPriceTrend = (params) =>
   request.get('/api/prices/trend', { params })
 
-export const getTopProducts = () =>
-  request.get('/api/prices/top-products')
-
 export const getDailyAvg = () =>
   request.get('/api/prices/daily-avg')
 

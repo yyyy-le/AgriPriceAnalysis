@@ -273,31 +273,17 @@ async def get_price_trend(
                MIN(pr.min_price) as min_price, MAX(pr.max_price) as max_price
         FROM price_records pr
         WHERE pr.product_id = :product_id
-          AND pr.time >= NOW() - INTERVAL '{days} days'
+          AND pr.time >= (
+              SELECT MAX(time) - INTERVAL '{days} days'
+              FROM price_records
+              WHERE product_id = :product_id
+          )
         GROUP BY DATE(pr.time)
         ORDER BY date ASC
     """
     rows = await session.execute(text(sql), {"product_id": product_id})
     return [dict(r._mapping) for r in rows]
 
-
-@router.get('/top-products', name='热门产品价格')
-async def get_top_products(
-    session: Annotated[AsyncSession, Depends(database_deps.get_db)],
-    user: Annotated[UserModel, Depends(auth_deps.get_auth_user)],
-):
-    sql = """
-        SELECT DISTINCT ON (p.id)
-               p.id, p.name as product_name, p.unit, c.name as category_name,
-               pr.avg_price, pr.min_price, pr.max_price, pr.time
-        FROM price_records pr
-        JOIN products p ON pr.product_id = p.id
-        JOIN categories c ON p.category_id = c.id
-        ORDER BY p.id, pr.time DESC
-        LIMIT 20
-    """
-    rows = await session.execute(text(sql))
-    return [dict(r._mapping) for r in rows]
 
 @router.get('/products/search', name='搜索产品')
 async def search_products(
@@ -370,46 +356,6 @@ async def get_wordcloud(
     """
     rows = await session.execute(text(sql))
     return [{"name": r.product_name, "value": int(r.count)} for r in rows]
-
-
-@router.get('/sunburst', name='品种旭日图数据')
-async def get_sunburst(
-    session: Annotated[AsyncSession, Depends(database_deps.get_db)],
-    user: Annotated[UserModel, Depends(auth_deps.get_auth_user)],
-):
-    sql = """
-        WITH ranked AS (
-            SELECT pc.name as parent_cat, c.name as child_cat,
-                   p.name as product_name, COUNT(pr.product_id) as record_count,
-                   ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY COUNT(pr.product_id) DESC) as rn
-            FROM products p
-            JOIN categories c ON p.category_id = c.id
-            JOIN categories pc ON c.parent_id = pc.id
-            LEFT JOIN price_records pr ON pr.product_id = p.id
-            GROUP BY pc.name, c.name, c.id, p.name
-        )
-        SELECT parent_cat, child_cat, product_name, record_count
-        FROM ranked WHERE rn <= 15
-        ORDER BY parent_cat, child_cat, record_count DESC
-    """
-    rows = await session.execute(text(sql))
-    records = [dict(r._mapping) for r in rows]
-
-    tree = {}
-    for r in records:
-        pc, cc, pn, cnt = r['parent_cat'], r['child_cat'], r['product_name'], int(r['record_count'] or 1)
-        if pc not in tree:
-            tree[pc] = {}
-        if cc not in tree[pc]:
-            tree[pc][cc] = []
-        tree[pc][cc].append({"name": pn, "value": cnt})
-
-    result = []
-    for pc, children in tree.items():
-        child_nodes = [{"name": cc, "children": prods} for cc, prods in children.items()]
-        result.append({"name": pc, "children": child_nodes})
-
-    return result
 
 
 @router.get('/volatility-trend', name='波动Top8产品30天走势')

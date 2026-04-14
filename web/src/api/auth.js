@@ -6,7 +6,7 @@ export const login = (username, password) => {
   formData.append('password', password)
   formData.append('grant_type', 'password')
 
-  return request.post('/api/auth/token/password', formData)  // ← 关键，不是 /api/auth/login
+  return request.post('/api/auth/token/password', formData)  
 }
 
 export const logout = () => {

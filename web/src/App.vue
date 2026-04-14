@@ -14,8 +14,7 @@
 
       <!-- Logo -->
       <div style="padding:28px 20px 22px;border-bottom:1px solid rgba(255,255,255,0.06)">
-        <div style="font-size:20px;font-weight:700;color:#f1f5f9;letter-spacing:0.5px">农产品价格系统</div>
-        <div style="font-size:12px;color:#475569;margin-top:6px">数据分析平台</div>
+        <div style="font-size:20px;font-weight:700;color:#f1f5f9;letter-spacing:0.5px">农产品物价数据分析系统</div>
       </div>
 
       <!-- 菜单 -->

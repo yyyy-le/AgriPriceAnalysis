@@ -25,6 +25,7 @@ class BaseCrawler(ABC):
         total_skipped = 0
         self._cancelled = False
         limit = 100
+        consecutive_skipped_count = 0  # 连续跳过计数器
 
         try:
             # first = await self.fetch(page=start_page, limit=limit)
@@ -46,16 +47,24 @@ class BaseCrawler(ABC):
                 total_saved += saved
                 total_skipped += skipped
 
+                # 重复数据检测逻辑
+                if saved == 0 and skipped > 0:
+                    # 当前页全部是重复数据
+                    consecutive_skipped_count += skipped
+                    logger.info(f"[{self.source_name}] 第 {page} 页全部重复，连续重复计数: {consecutive_skipped_count}")
+
+                    if consecutive_skipped_count >= 100:
+                        logger.info(f"[{self.source_name}] 连续重复 {consecutive_skipped_count} 条，判定无新数据，自动停止")
+                        break
+                else:
+                    # 有新数据保存，重置连续跳过计数器
+                    consecutive_skipped_count = 0
+
                 if self.on_progress:
                     await self.on_progress(page, total_pages, total_saved, total_skipped)
 
                 if page < total_pages:
                     await asyncio.sleep(random.uniform(1, 1.5))
-
-                # TODO: 重复检测暂时关闭，待完善检测逻辑后重新启用
-                # if saved == 0 and skipped > 0:
-                #     logger.info(f"[{self.source_name}] 检测到重复数据，停止抓取")
-                #     break
 
         except Exception as e:
             logger.error(f"[{self.source_name}] 爬虫异常: {e}")

@@ -182,19 +182,22 @@ async def get_alert_logs(
     offset = (page - 1) * page_size
 
     sql = """
-        SELECT al.id, al.triggered_at, al.price_value, al.threshold_value,
+        SELECT DISTINCT ON (DATE(al.triggered_at), al.alert_id)
+               al.id, al.triggered_at, al.price_value, al.threshold_value,
                al.alert_type, al.product_name, al.is_read
         FROM alert_logs al
         JOIN price_alerts pa ON al.alert_id = pa.id
         WHERE pa.user_id = :user_id
-        ORDER BY al.triggered_at DESC
+        ORDER BY DATE(al.triggered_at) DESC, al.alert_id, al.triggered_at ASC
         LIMIT :limit OFFSET :offset
     """
     count_sql = """
-        SELECT COUNT(*)
-        FROM alert_logs al
-        JOIN price_alerts pa ON al.alert_id = pa.id
-        WHERE pa.user_id = :user_id
+        SELECT COUNT(*) FROM (
+            SELECT DISTINCT DATE(al.triggered_at), al.alert_id
+            FROM alert_logs al
+            JOIN price_alerts pa ON al.alert_id = pa.id
+            WHERE pa.user_id = :user_id
+        ) AS unique_alerts
     """
 
     rows = await session.execute(text(sql), {

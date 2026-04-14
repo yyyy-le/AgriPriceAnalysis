@@ -217,6 +217,9 @@ async def get_products_aggregated(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
 ):
+    import logging
+    logger = logging.getLogger(__name__)
+
     offset = (page - 1) * page_size
     params = {"limit": page_size, "offset": offset}
     where_clauses = ["1=1"]
@@ -230,7 +233,6 @@ async def get_products_aggregated(
     elif parent_category_id:
         where_clauses.append("c.parent_id = :parent_category_id")
         params["parent_category_id"] = parent_category_id
-    # 日期条件：直接拼字符串到 SQL，避免 asyncpg 参数解析问题
     lateral_date_clauses = ["product_id = p.id"]
     if start_date:
         lateral_date_clauses.append(f"time >= '{start_date}'")
@@ -272,6 +274,9 @@ async def get_products_aggregated(
         LIMIT :limit OFFSET :offset
     """
 
+    logger.info(f"数据管理查询 SQL: {sql}")
+    logger.info(f"参数: {params}")
+
     count_sql = f"""
         SELECT COUNT(DISTINCT p.id)
         FROM products p
@@ -301,13 +306,17 @@ async def get_products_aggregated(
     total = await session.execute(text(count_sql), count_params)
     total_records = await session.execute(text(total_records_sql), count_params)
 
-    return {
+    result = {
         "total": total.scalar(),
         "total_records": total_records.scalar(),
         "page": page,
         "page_size": page_size,
         "list": [dict(r._mapping) for r in rows],
     }
+
+    logger.info(f"返回结果: total={result['total']}, total_records={result['total_records']}, list_count={len(result['list'])}")
+
+    return result
 
 
 # ===== 数据管理：原始记录（用于展开行） =====
@@ -330,7 +339,7 @@ async def get_price_records(
             date_clause += f" AND pr.time >= '{start_date}'"
         if end_date:
             date_clause += f" AND pr.time < '{end_date}'::date + INTERVAL '1 day'"
-        # 没有指定日期范围时，默认取最近 90 天
+        # 没有指定日期范围时，默认取最近 90 天（从该产品最新日期往前推）
         if not start_date and not end_date:
             date_clause = """ AND pr.time >= (
                   SELECT MAX(time) - INTERVAL '90 days'
