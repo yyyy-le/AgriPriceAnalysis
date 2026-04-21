@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep -E \"router\\\\.\\(get|post|put|delete|patch\\)\\\\\\(\" g:/个人/AgriPriceAnalysis/fastapi/app/http/api/*.py)"
+      "Bash(grep -E \"router\\\\.\\(get|post|put|delete|patch\\)\\\\\\(\" g:/个人/AgriPriceAnalysis/fastapi/app/http/api/*.py)",
+      "Bash(docker exec *)"
     ]
   }
 }

@@ -52,6 +52,7 @@ def _run_prophet(data, days):
         yearly_seasonality=len(df) >= 365,
         changepoint_prior_scale=0.05,
     )
+    m.add_country_holidays(country_name='CN')
     m.fit(df)
 
     future = m.make_future_dataframe(periods=days)

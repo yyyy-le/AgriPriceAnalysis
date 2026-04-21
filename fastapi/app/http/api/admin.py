@@ -447,7 +447,7 @@ async def update_price_record(
     return {"success": True}
 
 
-@router.post('/data/import-csv', name='CSV导入价格数据')
+@router.post('/data/import-csv', name='CSV/Excel导入价格数据')
 async def import_csv(
     request: Request,
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
@@ -456,10 +456,20 @@ async def import_csv(
 ):
     import csv
     import io
+    import pandas as pd
 
     content = await file.read()
-    text_content = content.decode('utf-8-sig')
-    reader = csv.DictReader(io.StringIO(text_content))
+    filename = file.filename.lower()
+
+    # 根据文件扩展名判断格式
+    if filename.endswith('.xlsx') or filename.endswith('.xls'):
+        # Excel 文件
+        df = pd.read_excel(io.BytesIO(content))
+        reader = df.to_dict('records')
+    else:
+        # CSV 文件
+        text_content = content.decode('utf-8-sig')
+        reader = list(csv.DictReader(io.StringIO(text_content)))
 
     saved = 0
     skipped = 0
@@ -467,15 +477,22 @@ async def import_csv(
 
     for i, row in enumerate(reader, start=2):
         try:
-            product_name = row.get('产品名称', '').strip()
-            parent_cat_name = row.get('一级分类', '').strip()
-            category_name = row.get('二级分类', '').strip()
-            market_name = row.get('市场/产地', '').strip() or '未知'
-            avg_price = float(row.get('均价', 0))
-            min_price = float(row.get('最低价', 0))
-            max_price = float(row.get('最高价', 0))
-            unit = row.get('单位', '').strip()
-            date_str = row.get('日期', '').strip()
+            # 兼容 pandas DataFrame 和 csv.DictReader
+            product_name = str(row.get('产品名称', '')).strip()
+            parent_cat_name = str(row.get('一级分类', '')).strip()
+            category_name = str(row.get('二级分类', '')).strip()
+            market_name = str(row.get('市场/产地', '')).strip() or '未知'
+
+            # 处理可能的 NaN 值
+            avg_price = row.get('均价', 0)
+            min_price = row.get('最低价', 0)
+            max_price = row.get('最高价', 0)
+            avg_price = float(avg_price) if pd.notna(avg_price) else 0.0
+            min_price = float(min_price) if pd.notna(min_price) else 0.0
+            max_price = float(max_price) if pd.notna(max_price) else 0.0
+
+            unit = str(row.get('单位', '')).strip()
+            date_str = str(row.get('日期', '')).strip()
 
             if not product_name or not date_str:
                 errors.append(f'第{i}行：产品名称或日期为空')

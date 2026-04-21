@@ -142,7 +142,7 @@ const adminMenus = [
   { path: '/admin/users',  label: '用户管理' },
   { path: '/admin/crawl',  label: '爬虫管理' },
   { path: '/admin/data',   label: '数据管理' },
-  { path: '/admin/import', label: 'CSV 导入' },
+  { path: '/admin/import', label: '数据导入' },
   { path: '/admin/logs',   label: '系统日志' },
 ]
 
@@ -156,7 +156,7 @@ const titleMap = {
   '/admin/users':  '用户管理',
   '/admin/crawl':  '爬虫管理',
   '/admin/data':   '数据管理',
-  '/admin/import': 'CSV 导入',
+  '/admin/import': '数据导入',
   '/admin/logs':   '系统日志',
 }
 

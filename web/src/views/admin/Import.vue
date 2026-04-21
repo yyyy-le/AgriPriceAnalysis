@@ -2,8 +2,8 @@
   <div>
     <!-- 说明 -->
     <el-card style="margin-bottom:16px">
-      <template #header><span>CSV 导入说明</span></template>
-      <p style="color:#666;font-size:14px;margin-bottom:12px">请按以下格式准备 CSV 文件（UTF-8 编码），第一行为表头：</p>
+      <template #header><span>数据导入说明</span></template>
+      <p style="color:#666;font-size:14px;margin-bottom:12px">请按以下格式准备文件（UTF-8 编码），第一行为表头：</p>
       <el-table :data="sampleData" border size="small" style="width:100%;margin-bottom:12px">
         <el-table-column prop="产品名称" label="产品名称" min-width="90"/>
         <el-table-column prop="一级分类" label="一级分类" min-width="90"/>
@@ -31,15 +31,15 @@
         ref="uploadRef"
         :auto-upload="false"
         :limit="1"
-        accept=".csv"
+        accept=".csv,.xlsx,.xls"
         :on-change="handleFileChange"
         :on-exceed="() => ElMessage.warning('每次只能上传一个文件')"
         drag
       >
         <div style="padding:30px 0">
           <div style="font-size:40px">📁</div>
-          <div style="margin-top:10px;color:#606266;font-size:14px">拖拽 CSV 文件到此处，或点击选择文件</div>
-          <div style="margin-top:4px;font-size:12px;color:#909399">仅支持 .csv 格式</div>
+          <div style="margin-top:10px;color:#606266;font-size:14px">拖拽 文件到此处，或点击选择文件</div>
+          <div style="margin-top:4px;font-size:12px;color:#909399">仅支持 .csv / .xlsx / .xls 格式</div>
         </div>
       </el-upload>
       <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
