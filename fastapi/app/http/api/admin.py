@@ -339,7 +339,6 @@ async def get_price_records(
             date_clause += f" AND pr.time >= '{start_date}'"
         if end_date:
             date_clause += f" AND pr.time < '{end_date}'::date + INTERVAL '1 day'"
-        # 没有指定日期范围时，默认取最近 90 天（从该产品最新日期往前推）
         if not start_date and not end_date:
             date_clause = """ AND pr.time >= (
                   SELECT MAX(time) - INTERVAL '90 days'

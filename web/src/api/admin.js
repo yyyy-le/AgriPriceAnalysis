@@ -33,7 +33,8 @@ export const importCsv = (file) => {
   const formData = new FormData()
   formData.append('file', file)
   return request.post('/api/admin/data/import-csv', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 300000 // 5分钟超时，适应大文件导入
   })
 }
 

@@ -45,7 +45,7 @@
       <el-col :span="12">
         <el-card shadow="never" style="border:1px solid #e8eaf0">
           <template #header>
-            <span style="font-size:14px;font-weight:500;color:#1e293b">🔺 今日最贵 Top10（元/kg）</span>
+            <span style="font-size:14px;font-weight:500;color:#1e293b">🔺 最贵 Top10（元/kg）</span>
           </template>
           <div ref="expensiveRef" style="height:300px"/>
         </el-card>
@@ -53,7 +53,7 @@
       <el-col :span="12">
         <el-card shadow="never" style="border:1px solid #e8eaf0">
           <template #header>
-            <span style="font-size:14px;font-weight:500;color:#1e293b">🔻 今日最便宜 Top10（元/kg）</span>
+            <span style="font-size:14px;font-weight:500;color:#1e293b">🔻 最便宜 Top10（元/kg）</span>
           </template>
           <div ref="cheapestRef" style="height:300px"/>
         </el-card>
