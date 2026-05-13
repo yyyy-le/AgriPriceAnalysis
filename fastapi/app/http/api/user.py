@@ -39,7 +39,7 @@ async def change_password(
     old_password: str = Body(..., description='原密码'),
     new_password: str = Body(..., description='新密码'),
 ):
-    # 查询数据库中存储的密码（ORM 对象可能不含密码字段）
+    # 查询数据库中存储的密码
     row = await session.execute(
         text("SELECT password FROM users WHERE id = :id"),
         {"id": str(user.id)}

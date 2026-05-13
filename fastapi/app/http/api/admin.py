@@ -167,7 +167,6 @@ async def update_user_state(
     await session.commit()
     return {"success": True}
 
-
 @router.patch('/users/{user_id}/admin', name='设置管理员')
 async def update_user_admin(
     user_id: str,
@@ -183,7 +182,6 @@ async def update_user_admin(
     await write_log(session, admin, 'update_user_admin', f'用户ID {user_id}', f'管理员权限:{is_admin}', request)
     await session.commit()
     return {"success": True}
-
 
 @router.delete('/users/{user_id}', name='删除用户')
 async def delete_user(
@@ -477,7 +475,6 @@ async def import_csv(
 
     for i, row in enumerate(reader, start=2):
         try:
-            # 兼容 pandas DataFrame 和 csv.DictReader
             product_name = str(row.get('产品名称', '')).strip()
             parent_cat_name = str(row.get('一级分类', '')).strip()
             category_name = str(row.get('二级分类', '')).strip()

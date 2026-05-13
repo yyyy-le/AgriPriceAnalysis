@@ -216,9 +216,23 @@ const renderBar = (el, data, nameKey, valueKey, color) => {
 }
 
 const renderTrend = (trendData) => {
-  if (!trendData || !trendData.dates) return
+  if (!trendData || !trendData.dates || !trendData.series || trendData.series.length === 0) return
   const colors = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#3b82f6', '#14b8a6', '#8b5cf6', '#f97316']
   const c = initChart(trendRef.value)
+
+  // 计算所有价格的最大值和最小值，用于设置合理的 Y 轴范围
+  let allPrices = []
+  trendData.series.forEach(s => {
+    s.data.forEach(d => {
+      if (d.price != null && !isNaN(d.price)) {
+        allPrices.push(d.price)
+      }
+    })
+  })
+
+  const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : 0
+  const maxPrice = allPrices.length > 0 ? Math.max(...allPrices) : 100
+
   c.setOption({
     tooltip: {
       trigger: 'axis',
@@ -226,7 +240,7 @@ const renderTrend = (trendData) => {
         let str = `${params[0].axisValue}<br/>`
         params.forEach(p => {
           if (p.value != null) {
-            str += `${p.marker}${p.seriesName}：${p.value} 元<br/>`
+            str += `${p.marker}${p.seriesName}：${p.value} 元/kg<br/>`
           }
         })
         return str
@@ -238,7 +252,7 @@ const renderTrend = (trendData) => {
       itemWidth: 12,
       itemHeight: 8,
     },
-    grid: { left: 50, right: 20, top: 20, bottom: 60 },
+    grid: { left: 60, right: 20, top: 30, bottom: 60 },
     xAxis: {
       type: 'category',
       data: trendData.dates,
@@ -248,20 +262,24 @@ const renderTrend = (trendData) => {
       type: 'value',
       name: '元/kg',
       nameTextStyle: { fontSize: 11 },
-      axisLabel: { fontSize: 11 }
+      nameGap: 10,
+      axisLabel: { fontSize: 11 },
+      min: Math.floor(minPrice * 0.9),
+      max: Math.ceil(maxPrice * 1.1)
     },
     series: trendData.series.map((s, i) => ({
       name: s.name,
       type: 'line',
       smooth: true,
-      symbol: 'none',
+      symbol: 'circle',
+      symbolSize: 4,
       data: trendData.dates.map(date => {
         const found = s.data.find(d => d.date === date)
-        return found ? found.price : null
+        return found ? Number(found.price) : null
       }),
       lineStyle: { color: colors[i % colors.length], width: 2 },
       itemStyle: { color: colors[i % colors.length] },
-      connectNulls: false,
+      connectNulls: true,
     }))
   })
 }

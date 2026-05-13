@@ -288,6 +288,10 @@ const fetchTrend = async () => {
 const fetchPredict = async () => {
   if (!selectedProductId.value) return
   predictLoading.value = true
+  if (predictChart) {
+    predictChart.dispose()
+    predictChart = null
+  }
   predictData.value = null
   analysisText.value = ''
   try {

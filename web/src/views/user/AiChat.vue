@@ -91,14 +91,33 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, watch, nextTick, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { chatWithAI } from '../../api/ai'
 
-const messages = ref([])
+const STORAGE_KEY = 'ai_chat_messages'
+
+const loadMessages = () => {
+  try {
+    const saved = sessionStorage.getItem(STORAGE_KEY)
+    return saved ? JSON.parse(saved) : []
+  } catch {
+    return []
+  }
+}
+
+const messages = ref(loadMessages())
 const inputText = ref('')
 const loading = ref(false)
 const scrollbarRef = ref()
+
+watch(messages, (val) => {
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(val))
+}, { deep: true })
+
+onMounted(async () => {
+  if (messages.value.length) await scrollToBottom()
+})
 
 const quickQuestions = [
   '大白菜今天多少钱？',

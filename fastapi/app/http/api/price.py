@@ -47,6 +47,25 @@ async def get_daily_avg(
     return result
 
 
+@router.get('/top-expensive', name='今日最贵产品Top10')
+async def get_top_expensive(
+    session: Annotated[AsyncSession, Depends(database_deps.get_db)],
+    user: Annotated[UserModel, Depends(auth_deps.get_auth_user)],
+):
+    sql = """
+        SELECT p.name as product_name, ROUND(AVG(pr.avg_price)::numeric, 2) as avg_price, p.unit
+        FROM price_records pr
+        JOIN products p ON pr.product_id = p.id
+        WHERE DATE(pr.time) = (SELECT DATE(MAX(time)) FROM price_records)
+        GROUP BY p.name, p.unit
+        ORDER BY avg_price DESC
+        LIMIT 10
+    """
+    rows = await session.execute(text(sql))
+    return [dict(r._mapping) for r in rows]
+
+
+
 @router.get('/category-stats', name='各分类记录数占比')
 async def get_category_stats(
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
@@ -64,22 +83,7 @@ async def get_category_stats(
     return [dict(r._mapping) for r in rows]
 
 
-@router.get('/top-expensive', name='今日最贵产品Top10')
-async def get_top_expensive(
-    session: Annotated[AsyncSession, Depends(database_deps.get_db)],
-    user: Annotated[UserModel, Depends(auth_deps.get_auth_user)],
-):
-    sql = """
-        SELECT p.name as product_name, ROUND(AVG(pr.avg_price)::numeric, 2) as avg_price, p.unit
-        FROM price_records pr
-        JOIN products p ON pr.product_id = p.id
-        WHERE DATE(pr.time) = (SELECT DATE(MAX(time)) FROM price_records)
-        GROUP BY p.name, p.unit
-        ORDER BY avg_price DESC
-        LIMIT 10
-    """
-    rows = await session.execute(text(sql))
-    return [dict(r._mapping) for r in rows]
+
 
 
 @router.get('/top-cheapest', name='今日最便宜产品Top10')
@@ -206,7 +210,7 @@ async def get_price_list(
         where_clauses.append("p.category_id = :category_id")
         params["category_id"] = category_id
     elif parent_category_id:
-        where_clauses.append("c.parent_id = :parent_category_id")
+        where_clauses.append("(c.id = :parent_category_id OR c.parent_id = :parent_category_id)")
         params["parent_category_id"] = parent_category_id
     if date_start:
         where_clauses.append("DATE(pr.time) >= :date_start")
@@ -363,30 +367,33 @@ async def get_volatility_trend(
     session: Annotated[AsyncSession, Depends(database_deps.get_db)],
     user: Annotated[UserModel, Depends(auth_deps.get_auth_user)],
 ):
-    # 先取波动最大的Top8产品名
+    # 先取波动最大的Top8产品名（排除异常高价和低价产品，只看0.5-50元/kg范围内的）
     top_sql = """
-        SELECT p.name as product_name
+        SELECT p.name as product_name,
+               ROUND(((MAX(pr.max_price) - MIN(pr.min_price)) / NULLIF(AVG(pr.avg_price), 0) * 100)::numeric, 1) as volatility_pct
         FROM price_records pr
         JOIN products p ON pr.product_id = p.id
+        WHERE pr.time >= (SELECT MAX(time) - INTERVAL '30 days' FROM price_records)
         GROUP BY p.name
-        HAVING AVG(pr.avg_price) > 0
-        ORDER BY ((MAX(pr.max_price) - MIN(pr.min_price)) / NULLIF(AVG(pr.avg_price), 0)) DESC
+        HAVING AVG(pr.avg_price) > 0.5 AND AVG(pr.avg_price) < 50
+           AND COUNT(*) >= 5
+        ORDER BY volatility_pct DESC
         LIMIT 8
     """
     top_rows = await session.execute(text(top_sql))
     top_products = [r.product_name for r in top_rows]
 
     if not top_products:
-        return []
+        return {"dates": [], "series": []}
 
-    # 取这8个产品近30天每日均价
+    # 取这8个产品近30天每日均价（从数据库最新日期往前推30天）
     detail_sql = """
         SELECT p.name as product_name, DATE(pr.time) as date,
                ROUND(AVG(pr.avg_price)::numeric, 2) as avg_price
         FROM price_records pr
         JOIN products p ON pr.product_id = p.id
         WHERE p.name = ANY(:names)
-          AND pr.time >= NOW() - INTERVAL '30 days'
+          AND pr.time >= (SELECT MAX(time) - INTERVAL '30 days' FROM price_records)
         GROUP BY p.name, DATE(pr.time)
         ORDER BY p.name, date ASC
     """

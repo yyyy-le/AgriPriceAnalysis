@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+import asyncio
 import pandas as pd
 import json
 import httpx
@@ -57,9 +58,11 @@ def _run_prophet(data, days):
     m.add_country_holidays(country_name='CN')
     m.fit(df)
 
+    #预测未来N天
     future = m.make_future_dataframe(periods=days)
     forecast = m.predict(future)
 
+    #提取预测结果
     last_date = df['ds'].max()
     future_fc = forecast[forecast['ds'] > last_date][['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
 
@@ -80,6 +83,7 @@ async def predict_price(
 
     df, future_fc = _run_prophet(data, days)
 
+    
     current_price = round(float(df['y'].iloc[-1]), 2)
     last_pred = round(float(future_fc['yhat'].iloc[-1]), 2)
     change_pct = round((last_pred - current_price) / current_price * 100, 2)
@@ -142,7 +146,7 @@ async def predict_analysis(
             f"（区间 {round(float(max(row['yhat_lower'], 0)), 2)}~{round(float(row['yhat_upper']), 2)}）"
         )
 
-    prompt = f"""你是资深农产品市场分析师，拥有多年一线市场经验。请根据以下真实数据，撰写一份详尽、专业的价格分析报告，供采购商、批发商和农户参考决策。
+    prompt = f"""你是资深农产品市场分析师。请根据以下真实数据，撰写一份专业的价格分析报告，供采购商、批发商和农户参考决策。直接输出报告正文，不要有任何开场白、自我介绍或结束语。
 
 ### 数据摘要
 - **产品名称**：{product_name}（计量单位：{unit}）
@@ -181,7 +185,13 @@ async def predict_analysis(
 - **套期保值**：如有期货或订单农业机会，是否建议锁定远期价格。
 
 ---
-*本报告基于历史价格数据与预测模型生成，仅供参考，实际市场行情受多重突发因素影响，建议结合实时市场信息综合研判后做出决策。*"""
+
+报告输出完毕后，必须在最后固定输出以下免责声明，不得省略、修改或替换：
+
+---
+**⚠️ 免责声明**
+本报告基于历史价格数据与 Prophet 预测模型自动生成，仅供参考，不构成任何投资或交易建议。农产品价格受天气、政策、供需等多重因素影响，实际行情可能与预测存在较大偏差。市场有风险，决策需谨慎，请结合实时市场信息综合研判后再做决策。
+---"""
 
     async def generate():
         async with httpx.AsyncClient(timeout=120) as client:
