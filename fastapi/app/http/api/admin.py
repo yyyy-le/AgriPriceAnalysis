@@ -572,7 +572,6 @@ async def import_csv(
                     {"name": market_name}
                 )
                 market_id = mkt_result.fetchone()[0]
-
             ins = await session.execute(text("""
                 INSERT INTO price_records (time, product_id, market_id, price, min_price, max_price, avg_price, source)
                 VALUES (:time, :product_id, :market_id, :avg_price, :min_price, :max_price, :avg_price, 'csv')
@@ -582,16 +581,13 @@ async def import_csv(
                 "time": record_time, "product_id": product_id, "market_id": market_id,
                 "avg_price": avg_price, "min_price": min_price, "max_price": max_price
             })
-
             if ins.fetchone():
                 saved += 1
             else:
                 skipped += 1
-
         except Exception as e:
             errors.append(f'第{i}行处理失败：{str(e)}')
             skipped += 1
-
     await write_log(session, admin, 'import_csv', file.filename, f'导入:{saved} 跳过:{skipped}', request)
     await session.commit()
     return {"saved": saved, "skipped": skipped, "errors": errors}

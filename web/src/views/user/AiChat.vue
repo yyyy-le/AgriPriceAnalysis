@@ -24,7 +24,7 @@
           <div v-for="(msg, i) in messages" :key="i" style="margin-bottom:20px">
             <div v-if="msg.role === 'user'" style="display:flex;justify-content:flex-end">
               <div style="
-                max-width:72%;background:#409eff;color:#fff;
+                max-width:72%;background:#3b82f6;color:#fff;
                 padding:10px 16px;border-radius:18px 18px 4px 18px;
                 font-size:14px;line-height:1.7;word-break:break-word
               ">{{ msg.content }}</div>
@@ -33,7 +33,7 @@
             <div v-else style="display:flex;gap:10px;align-items:flex-start">
               <div style="
                 width:34px;height:34px;border-radius:50%;
-                background:linear-gradient(135deg,#667eea,#764ba2);
+                background:linear-gradient(135deg,#3b82f6,#60a5fa);
                 display:flex;align-items:center;justify-content:center;
                 font-size:18px;flex-shrink:0;margin-top:2px
               ">🤖</div>
@@ -49,7 +49,7 @@
                   min-height:40px
                 ">
                   <span>{{ msg.content }}</span>
-                  <span v-if="msg.loading" style="display:inline-block;animation:blink 1s infinite;color:#409eff">▋</span>
+                  <span v-if="msg.loading" style="display:inline-block;animation:blink 1s infinite;color:#3b82f6">▋</span>
                 </div>
               </div>
             </div>

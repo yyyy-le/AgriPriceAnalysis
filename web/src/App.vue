@@ -10,11 +10,11 @@
   <div v-else style="display:flex;height:100vh;overflow:hidden">
 
     <!-- 侧边栏 -->
-    <div style="width:220px;background:#0f172a;display:flex;flex-direction:column;flex-shrink:0">
+    <div style="width:220px;background:#1e3a5f;display:flex;flex-direction:column;flex-shrink:0">
 
       <!-- Logo -->
-      <div style="padding:28px 20px 22px;border-bottom:1px solid rgba(255,255,255,0.06)">
-        <div style="font-size:20px;font-weight:700;color:#f1f5f9;letter-spacing:0.5px">农产品物价数据分析系统</div>
+      <div style="padding:24px 20px 20px;border-bottom:1px solid rgba(255,255,255,0.08)">
+        <div style="font-size:15px;font-weight:700;color:#f8fafc;letter-spacing:0.5px;line-height:1.5">农产品物价数据分析系统</div>
       </div>
 
       <!-- 菜单 -->
@@ -29,9 +29,9 @@
               font-weight:${$route.path === item.path ? '600' : '500'};
               cursor:pointer;
               transition:all 0.2s;
-              color:${$route.path === item.path ? '#ffffff' : '#64748b'};
-              background:${$route.path === item.path ? 'rgba(99,102,241,0.2)' : 'transparent'};
-              border-left:${$route.path === item.path ? '3px solid #6366f1' : '3px solid transparent'};
+              color:${$route.path === item.path ? '#ffffff' : '#93c5fd'};
+              background:${$route.path === item.path ? 'rgba(59,130,246,0.25)' : 'transparent'};
+              border-left:${$route.path === item.path ? '3px solid #3b82f6' : '3px solid transparent'};
             `">
               {{ item.label }}
             </div>
@@ -48,9 +48,9 @@
               font-weight:${$route.path === item.path ? '600' : '500'};
               cursor:pointer;
               transition:all 0.2s;
-              color:${$route.path === item.path ? '#ffffff' : '#64748b'};
-              background:${$route.path === item.path ? 'rgba(99,102,241,0.2)' : 'transparent'};
-              border-left:${$route.path === item.path ? '3px solid #6366f1' : '3px solid transparent'};
+              color:${$route.path === item.path ? '#ffffff' : '#93c5fd'};
+              background:${$route.path === item.path ? 'rgba(59,130,246,0.25)' : 'transparent'};
+              border-left:${$route.path === item.path ? '3px solid #3b82f6' : '3px solid transparent'};
             `">
               {{ item.label }}
             </div>
@@ -59,7 +59,7 @@
       </div>
 
       <!-- 底部用户信息 -->
-      <div style="padding:16px 20px;border-top:1px solid rgba(255,255,255,0.06)">
+      <div style="padding:16px 20px;border-top:1px solid rgba(255,255,255,0.08)">
         <div style="display:flex;align-items:center;gap:10px">
           <div
             style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer"
@@ -67,7 +67,7 @@
           >
             <div :style="`
               width:34px;height:34px;border-radius:50%;
-              background:${$route.path === '/profile' ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'linear-gradient(135deg,#334155,#475569)'};
+              background:${$route.path === '/profile' ? 'linear-gradient(135deg,#3b82f6,#60a5fa)' : 'linear-gradient(135deg,#1e3a5f,#2d5a8e)'};
               display:flex;align-items:center;justify-content:center;
               color:#fff;font-size:14px;font-weight:600;flex-shrink:0;
               transition:all 0.2s;
@@ -78,7 +78,7 @@
               <div :style="`
                 font-size:${$route.path === '/profile' ? '15px' : '14px'};
                 font-weight:${$route.path === '/profile' ? '600' : '500'};
-                color:${$route.path === '/profile' ? '#ffffff' : '#f1f5f9'};
+                color:${$route.path === '/profile' ? '#ffffff' : '#f8fafc'};
                 overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
                 transition:all 0.2s;
               `">
@@ -102,9 +102,9 @@
       <div style="
         height:60px;background:#fff;
         display:flex;align-items:center;
-        padding:0 28px;border-bottom:1px solid #e8eaf0;flex-shrink:0
+        padding:0 28px;border-bottom:1px solid #e5e7eb;flex-shrink:0
       ">
-        <span style="font-size:22px;font-weight:700;color:#1e293b">{{ currentTitle }}</span>
+        <span style="font-size:20px;font-weight:700;color:#1f2937;letter-spacing:0.3px">{{ currentTitle }}</span>
       </div>
 
       <!-- 页面内容 -->
@@ -177,8 +177,9 @@ onMounted(() => {
 </script>
 
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Microsoft YaHei', sans-serif; }
+body { font-family: 'Poppins', 'Microsoft YaHei', sans-serif; }
 a { text-decoration: none; }
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }

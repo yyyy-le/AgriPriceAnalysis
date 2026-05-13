@@ -478,7 +478,7 @@ watch(selectedProductId, () => {
 .ai-cursor {
   display: inline-block;
   animation: blink 1s infinite;
-  color: #409eff;
+  color: #3b82f6;
   font-weight: bold;
 }
 </style>

@@ -83,11 +83,13 @@ def test_product(category, product_name):
 
     m = Prophet(
         daily_seasonality=False,
-        weekly_seasonality=True,
-        yearly_seasonality=len(train) >= 365,
+        weekly_seasonality=False,
+        yearly_seasonality=len(df) >= 730,
         changepoint_prior_scale=0.05,
+        holidays_prior_scale=1.0
     )
-    m.fit(train)
+    m.add_country_holidays(country_name='CN')
+    m.fit(df)
 
     future = m.make_future_dataframe(periods=len(test))
     forecast = m.predict(future)
